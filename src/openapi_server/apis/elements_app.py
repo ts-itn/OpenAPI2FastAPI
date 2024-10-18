@@ -57,4 +57,16 @@ async def get_element_data_series(
     if not BaseElementsApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseElementsApi.subclasses[0]().get_element_data_series(oemISOidentifier, element_uid, page_number)
+
+@router.get(
+    "/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}",
+    responses = {
+        200:{"model":Element, "description": "Successful operation"}, 
+        400 :{"description":"Invalid parameters supplied"}, 
+        404 : {"description": "No elements  found"},
+    }, 
+    tags = ["Elemenst"], 
+    summary= "Get all value of element with uid", 
+    response_model_by_alias= True
+)
     

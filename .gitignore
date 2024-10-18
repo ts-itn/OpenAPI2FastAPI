@@ -1,0 +1,12 @@
+# Ignore specific directories and files for openapi2fastapi project
+lib64/
+pyvenv.cfg
+python/
+python3/
+python3.10/
+# Ignore python related directories
+python*/
+
+# Ignore virtual environment config file
+pyvenv.cfg
+openapi2fastapi
