@@ -1,0 +1,1116 @@
+openapi: 3.0.2
+info:
+  description: MIC4.0 - Cluster Special foundations - Element-Interfaces definition
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: MiC4.0 Element API Cluster special foundation
+  version: 3.0.0 // 10.06.2024
+servers:
+- url: "{BaseURL}"
+  variables:
+    BaseURL:
+      default: https://localhost
+security:
+- bearer: []
+tags:
+- description: Element endpoints
+  externalDocs:
+    description: Find out more about the working group
+    url: https://mic40.org/en/arbeitskreise/arbeitskreis-maschinendaten/cluster-3-spezialtiefbaumaschinen/
+  name: Elements
+paths:
+  /Fleet/Equipment/{oemISOidentifier}/elements:
+    get:
+      description: Returns all available elementids with names between start and endDate
+      operationId: getElementsByStartdateAndEnddate
+      parameters:
+      - description: "OEM ISO identifier, as defined in ISO 15143-3"
+        example: 7RM32YG4M00007328
+        explode: false
+        in: path
+        name: oemISOidentifier
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: Start time/date in UTC format
+        example: ' 2023-04-23T17:25:43.511Z'
+        explode: true
+        in: query
+        name: start-date
+        required: true
+        schema:
+          format: datetime
+          type: string
+        style: form
+      - description: End time/date in UTC format
+        example: ' 2023-04-23T18:25:43.511Z'
+        explode: true
+        in: query
+        name: end-date
+        required: true
+        schema:
+          format: datetime
+          type: string
+        style: form
+      - description: "Page number, starting from 1"
+        example: "1"
+        explode: true
+        in: query
+        name: page-number
+        required: true
+        schema:
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/elementShortList'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/elementShortList'
+          description: Successful operation
+        "400":
+          description: Invalid parameter supplied
+        "404":
+          description: No element(s) found
+      summary: Get all element-uid's between start and end date
+      tags:
+      - Elements
+  /Fleet/Equipment/{oemISOidentifier}/elements/{element-uid}:
+    get:
+      description: Returns all information about one element
+      operationId: getElementDetails
+      parameters:
+      - description: "OEM ISO identifier, as defined in ISO 15143-3"
+        example: 7RM32YG4M00007328
+        explode: false
+        in: path
+        name: oemISOidentifier
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: unique Id of the element
+        explode: false
+        in: path
+        name: element-uid
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "Page number, starting from 1"
+        explode: true
+        in: query
+        name: page-number
+        required: true
+        schema:
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/element'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/element'
+          description: Successful operation
+        "400":
+          description: Invalid parameter supplied
+        "404":
+          description: No element(s) found
+      summary: Get all values of element with uid
+      tags:
+      - Elements
+  /Fleet/Equipment/{oemISOidentifier}/elements/{element-uid}/data-series/:
+    get:
+      description: Returns requested dataseries from the list about one element
+      operationId: getElementDataSeries
+      parameters:
+      - description: "OEM ISO identifier, as defined in ISO 15143-3"
+        example: 7RM32YG4M00007328
+        explode: false
+        in: path
+        name: oemISOidentifier
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: Unique Id of the element
+        explode: false
+        in: path
+        name: element-uid
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "Page number, starting from 1"
+        example: "1"
+        explode: true
+        in: query
+        name: page-number
+        required: true
+        schema:
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getdataSeries'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/getdataSeries'
+          description: Successful operation
+        "400":
+          description: Invalid parameter supplied
+        "404":
+          description: No element(s) found
+      summary: Get selected data-series of element with uid
+      tags:
+      - Elements
+  /Fleet/Equipment/{oemISOidentifier}/elements/{element-uid}/measurement-pass/:
+    get:
+      description: Returns requested measurement pass dataseries about one element
+      operationId: getElementMeassurementDataSeries
+      parameters:
+      - description: "OEM ISO identifier, as defined in ISO 15143-3"
+        example: 7RM32YG4M00007328
+        explode: false
+        in: path
+        name: oemISOidentifier
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: unique Id of the element
+        explode: false
+        in: path
+        name: element-uid
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "Page number, starting from 1"
+        example: "1"
+        explode: true
+        in: query
+        name: page-number
+        required: true
+        schema:
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getMeasurementPassSeries'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/getMeasurementPassSeries'
+          description: Successful operation
+        "400":
+          description: Invalid parameter supplied
+        "404":
+          description: No element(s) found
+      summary: Get all data-series of a measurement pass of element with uid
+      tags:
+      - Elements
+  /Fleet/Equipment/{oemISOidentifier}/elements/{element-uid}/event-data/:
+    get:
+      description: Returns requested event data about one element
+      operationId: getElementEventData
+      parameters:
+      - description: "OEM ISO identifier, as defined in ISO 15143-3"
+        example: 7RM32YG4M00007328
+        explode: false
+        in: path
+        name: oemISOidentifier
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: unique Id of the element
+        explode: false
+        in: path
+        name: element-uid
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "Page number, starting from 1"
+        example: "1"
+        explode: true
+        in: query
+        name: page-number
+        required: true
+        schema:
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getEventData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/getEventData'
+          description: Successful operation
+        "400":
+          description: Invalid parameter supplied
+        "404":
+          description: No element(s) found
+      summary: Get all event data of element with uid
+      tags:
+      - Elements
+  /Fleet/Equipment/{oemISOidentifier}/elements/{element-uid}/header:
+    get:
+      description: Returns all header information about one element
+      operationId: getHeader
+      parameters:
+      - description: "OEM ISO identifier, as defined in ISO 15143-3"
+        example: 7RM32YG4M00007328
+        explode: false
+        in: path
+        name: oemISOidentifier
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: Unique Id of the element
+        explode: false
+        in: path
+        name: element-uid
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getElementHeader'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/getElementHeader'
+          description: Successful operation
+        "400":
+          description: Invalid parameter supplied
+        "404":
+          description: No element(s) found
+      summary: Get all header information / header parameter of element with uid
+      tags:
+      - Elements
+components:
+  schemas:
+    element:
+      example:
+        eventData:
+        - statusEnd: 2023-04-23T18:25:43.511Z
+          statusStart: 2023-04-23T18:25:43.511Z
+          comment: comment
+        - statusEnd: 2023-04-23T18:25:43.511Z
+          statusStart: 2023-04-23T18:25:43.511Z
+          comment: comment
+        dataSeries:
+        - slewingGearAngle: 219.4
+          vibratorAmplitude: 2.3
+          concretePressure: 2.3
+          rotationSpeedCasing: 17.1
+          totalConcreteVolume: 17
+          crowdForce: 20.2
+          leaderInclinationX: -0.1
+          rotationSpeedRotaryDrive: 17.1
+          crowdSpeed: 120
+          vibratorFrequency: 2.3
+          rotationSpeedAuger: 17.1
+          rotationRate: 3
+          depth: 3.13
+          intrusion: 3
+          staticMoment: 2.3
+          relativeAugerPosition: 17
+          leaderInclinationY: -0.1
+          energyPerBlow: 11.1
+          kellyRopeSpeed: 2.1
+          drillingTorque: 320.0
+          timestamp: 2023-04-23T18:25:43.511Z
+        - slewingGearAngle: 219.4
+          vibratorAmplitude: 2.3
+          concretePressure: 2.3
+          rotationSpeedCasing: 17.1
+          totalConcreteVolume: 17
+          crowdForce: 20.2
+          leaderInclinationX: -0.1
+          rotationSpeedRotaryDrive: 17.1
+          crowdSpeed: 120
+          vibratorFrequency: 2.3
+          rotationSpeedAuger: 17.1
+          rotationRate: 3
+          depth: 3.13
+          intrusion: 3
+          staticMoment: 2.3
+          relativeAugerPosition: 17
+          leaderInclinationY: -0.1
+          energyPerBlow: 11.1
+          kellyRopeSpeed: 2.1
+          drillingTorque: 320.0
+          timestamp: 2023-04-23T18:25:43.511Z
+        measurementPassSeries:
+        - depth: 17.1
+          deviationX: 2.1
+          rotationZ: 2.1
+          loweringSpeed: 2.1
+          deviationY: 2.1
+          inclinationX: 2.1
+          inclinationY: 2.1
+          timestamp: 2019-08-02T09:54:27.36Z
+        - depth: 17.1
+          deviationX: 2.1
+          rotationZ: 2.1
+          loweringSpeed: 2.1
+          deviationY: 2.1
+          inclinationX: 2.1
+          inclinationY: 2.1
+          timestamp: 2019-08-02T09:54:27.36Z
+        elementHeader:
+          elementNumber: P1715
+          workingMethod: impactPileDriving
+          elementUniqueID: "1234"
+          depthOrientation: "+"
+          ramBlockWeight: 0.8008281904610115
+          operatorID: operatorID
+          jobsite: London Subway
+          machineType: e.g. Klemm KR M-xxxxx
+          rotationDirection: "-"
+          recordStartDateTime: 2023-04-23T18:25:43.511Z
+          recordStopDateTime: 2023-04-23T18:25:43.511Z
+        prevLink:
+          href: https://...
+        statistics:
+          totalPages: 7
+          pageSize: 5
+          currentPage: 2
+        nextLink:
+          href: https://...
+      properties:
+        elementHeader:
+          $ref: '#/components/schemas/elementHeader'
+        dataSeries:
+          items:
+            $ref: '#/components/schemas/dataUnit'
+          title: dataSeries
+          type: array
+        eventData:
+          items:
+            $ref: '#/components/schemas/eventDataUnit'
+          title: eventData
+          type: array
+        measurementPassSeries:
+          items:
+            $ref: '#/components/schemas/measurementPassUnit'
+          title: measurementPassSeries
+          type: array
+        statistics:
+          $ref: '#/components/schemas/statistics'
+        prevLink:
+          $ref: '#/components/schemas/link'
+        nextLink:
+          $ref: '#/components/schemas/link'
+      required:
+      - dataSeries
+      - elementHeader
+      title: element
+      type: object
+    elementShort:
+      example:
+        elementUid: 095886-P1715-2022-08-02T09:54:27.360Z
+        elementName: P1715
+      properties:
+        elementName:
+          example: P1715
+          title: elementName
+          type: string
+        elementUid:
+          description: This id has to be unique for all elements of a manufacturer
+          example: 095886-P1715-2022-08-02T09:54:27.360Z
+          title: elementUid
+          type: string
+      required:
+      - elementName
+      - elementUid
+      title: elementShort
+      type: object
+    elementShortList:
+      example:
+        ShortList:
+        - elementUid: 095886-P1715-2022-08-02T09:54:27.360Z
+          elementName: P1715
+        - elementUid: 095886-P1715-2022-08-02T09:54:27.360Z
+          elementName: P1715
+        prevLink:
+          href: https://...
+        statistics:
+          totalPages: 7
+          pageSize: 5
+          currentPage: 2
+        nextLink:
+          href: https://...
+      properties:
+        ShortList:
+          items:
+            $ref: '#/components/schemas/elementShort'
+          title: ShortList
+          type: array
+        statistics:
+          $ref: '#/components/schemas/statistics'
+        prevLink:
+          $ref: '#/components/schemas/link'
+        nextLink:
+          $ref: '#/components/schemas/link'
+      required:
+      - ShortList
+      title: elementShortList
+      type: object
+    getElementHeader:
+      example:
+        elementHeader:
+          elementNumber: P1715
+          workingMethod: impactPileDriving
+          elementUniqueID: "1234"
+          depthOrientation: "+"
+          ramBlockWeight: 0.8008281904610115
+          operatorID: operatorID
+          jobsite: London Subway
+          machineType: e.g. Klemm KR M-xxxxx
+          rotationDirection: "-"
+          recordStartDateTime: 2023-04-23T18:25:43.511Z
+          recordStopDateTime: 2023-04-23T18:25:43.511Z
+      properties:
+        elementHeader:
+          $ref: '#/components/schemas/elementHeader'
+      required:
+      - elementHeader
+      title: getElementHeader
+      type: object
+    elementHeader:
+      example:
+        elementNumber: P1715
+        workingMethod: impactPileDriving
+        elementUniqueID: "1234"
+        depthOrientation: "+"
+        ramBlockWeight: 0.8008281904610115
+        operatorID: operatorID
+        jobsite: London Subway
+        machineType: e.g. Klemm KR M-xxxxx
+        rotationDirection: "-"
+        recordStartDateTime: 2023-04-23T18:25:43.511Z
+        recordStopDateTime: 2023-04-23T18:25:43.511Z
+      properties:
+        elementUniqueID:
+          description: "This id has to be unique for all elements of a manufacturer\
+            \ <br> Element description - General <br> Organisational data reference;\
+            \ element name = ID; API topic; no duplicate values; unique reference\
+            \ to the element; multi working method: UniqueID could be the same independent\
+            \ from the working method (same entry point); "
+          example: "1234"
+          title: elementUniqueID
+          type: string
+        workingMethod:
+          description: General information - Application <br> Procedure according
+            to definition MiC 4.0
+          example: impactPileDriving
+          title: workingMethod
+          type: string
+        machineType:
+          description: "General information <br> Definition according to ISO 15143-3\
+            \ Equipment Header, Make + Model + Serial Number separated with spaces "
+          example: e.g. Klemm KR M-xxxxx
+          title: machineType
+          type: string
+        elementNumber:
+          description: "The name of the element, <br> Element description - General\
+            \  <br> e.g. pile number <br> free text, <br><br>  Agreement for working\
+            \ methods:<br> Kelly drilling <br> Continous flight auger drilling <br>\
+            \ Cased continous flight auger drilling <br> Full Displacement drilling\
+            \ <br> Vibro piling <br> Diaphragm wall grabing <br> Impact pile driving"
+          example: P1715
+          title: elementNumber
+          type: string
+        recordStartDateTime:
+          description: The Timestamp with timezone of starting the recording of element
+            production in UTC format <br> Start data recording; operator obligation;
+            push of the start button; recordstarttime; start of element;  <br> Element
+            - Execution - Time <br><br>  Agreement for working methods:<br> Kelly
+            drilling <br> Continous flight auger drilling <br> Cased continous flight
+            auger drilling <br> Full Displacement drilling <br> Impact pile driving
+            <br> Vibro piling <br> Diaphragm wall grabing
+          example: 2023-04-23T18:25:43.511Z
+          format: date-time
+          title: recordStartDateTime
+          type: string
+        recordStopDateTime:
+          description: "The Timestamp with timezone of end of the recording of element\
+            \ production, in UTC format <br> Stop data recording; operation obligation;\
+            \ push of the stop button; record end tim; end of element  <br> Element\
+            \ - Execution - Time <br><br>  Agreement for working methods:<br> Kelly\
+            \ drilling <br> Continous flight auger drilling <br> Cased continous flight\
+            \ auger drilling <br> Full Displacement drilling <br> Impact pile driving\
+            \ <br> Vibro piling <br> Diaphragm wall grabing "
+          example: 2023-04-23T18:25:43.511Z
+          format: date-time
+          title: recordStopDateTime
+          type: string
+        depthOrientation:
+          description: "The sign by moving down the hole  <br> plus/minus <br> 'plus'\
+            \ depth is increasing during down movment  'plus' depth is decreasing\
+            \ during down movment  <br> Application independent parameter  <br> '+\
+            \ if dept to bottom is positive | - if depth to bottom is negative <br><br>\
+            \  Agreement for working methods:  Continous flight auger drilling  <br>\
+            \ Impact pile driving <br> Full Displacement drilling  <br> Vibro piling"
+          example: "+"
+          title: depthOrientation
+          type: string
+        operatorID:
+          description: "Name of the operator <br> free text <br> Element description\
+            \ - General <br> Driver name; DVSGO - obligation of the operator <br><br>\
+            \  Agreement for working methods: <br> kelly drilling  <br> Continous\
+            \ flight auger drilling <br> Cased continous flight auger drilling <br>\
+            \ Full Displacement drilling  <br> Impact pile driving <br> VIBRO <br>\
+            \ Diaphragm wall grabing"
+          title: operatorID
+          type: string
+        rotationDirection:
+          description: "'+rotation direction to right is positiv | -rotation direction\
+            \ to right is negativ; rotation direction clockwise (view to pile); the\
+            \ same is used for slewing angle; 0/1 - Bit-definition --> +/- clockwise\
+            \ vs. Counterclockwise; recommendation: +/-<br> The sign by rotational\
+            \ moving<br> plus/minus <br> 'plus' rotational moving is positiv in right\
+            \ direction (clockwise) ; 'minus' rotational moving is negativ in right\
+            \ direction (clockwise) ; (View in the direction of the hole; Swinging\
+            \ is handled analog <br><br>  Agreement for working methods: Continous\
+            \ flight auger drilling <br> Full Displacement drilling "
+          example: "-"
+          title: rotationDirection
+          type: string
+        jobsite:
+          description: "The name of the jobsite - General Information - <br><br> \
+            \ Agreement for working methods: <br> all "
+          example: London Subway
+          title: jobsite
+          type: string
+        ramBlockWeight:
+          description: "Block Weight of the Ram <br> Attachment device - Description\
+            \ <br><br>  Agreement for working methods: <br> Impact pile driving "
+          title: ramBlockWeight
+          type: number
+      required:
+      - elementName
+      - elementUid
+      title: elementHeader
+      type: object
+    getMeasurementPassSeries:
+      example:
+        measurementPassSeries:
+        - depth: 17.1
+          deviationX: 2.1
+          rotationZ: 2.1
+          loweringSpeed: 2.1
+          deviationY: 2.1
+          inclinationX: 2.1
+          inclinationY: 2.1
+          timestamp: 2019-08-02T09:54:27.36Z
+        - depth: 17.1
+          deviationX: 2.1
+          rotationZ: 2.1
+          loweringSpeed: 2.1
+          deviationY: 2.1
+          inclinationX: 2.1
+          inclinationY: 2.1
+          timestamp: 2019-08-02T09:54:27.36Z
+        prevLink:
+          href: https://...
+        statistics:
+          totalPages: 7
+          pageSize: 5
+          currentPage: 2
+        nextLink:
+          href: https://...
+      properties:
+        measurementPassSeries:
+          items:
+            $ref: '#/components/schemas/measurementPassUnit'
+          title: measurementPassSeries
+          type: array
+        statistics:
+          $ref: '#/components/schemas/statistics'
+        prevLink:
+          $ref: '#/components/schemas/link'
+        nextLink:
+          $ref: '#/components/schemas/link'
+      required:
+      - measurementPassSeries
+      title: getMeasurementPassSeries
+      type: object
+    measurementPassSeries:
+      items:
+        $ref: '#/components/schemas/measurementPassUnit'
+      title: measurementPassSeries
+      type: array
+    getEventData:
+      example:
+        eventData:
+        - statusEnd: 2023-04-23T18:25:43.511Z
+          statusStart: 2023-04-23T18:25:43.511Z
+          comment: comment
+        - statusEnd: 2023-04-23T18:25:43.511Z
+          statusStart: 2023-04-23T18:25:43.511Z
+          comment: comment
+        prevLink:
+          href: https://...
+        statistics:
+          totalPages: 7
+          pageSize: 5
+          currentPage: 2
+        nextLink:
+          href: https://...
+      properties:
+        eventData:
+          items:
+            $ref: '#/components/schemas/eventDataUnit'
+          title: eventData
+          type: array
+        statistics:
+          $ref: '#/components/schemas/statistics'
+        prevLink:
+          $ref: '#/components/schemas/link'
+        nextLink:
+          $ref: '#/components/schemas/link'
+      required:
+      - eventData
+      title: getEventData
+      type: object
+    eventData:
+      items:
+        $ref: '#/components/schemas/eventDataUnit'
+      title: eventData
+      type: array
+    getdataSeries:
+      example:
+        dataSeries:
+        - slewingGearAngle: 219.4
+          vibratorAmplitude: 2.3
+          concretePressure: 2.3
+          rotationSpeedCasing: 17.1
+          totalConcreteVolume: 17
+          crowdForce: 20.2
+          leaderInclinationX: -0.1
+          rotationSpeedRotaryDrive: 17.1
+          crowdSpeed: 120
+          vibratorFrequency: 2.3
+          rotationSpeedAuger: 17.1
+          rotationRate: 3
+          depth: 3.13
+          intrusion: 3
+          staticMoment: 2.3
+          relativeAugerPosition: 17
+          leaderInclinationY: -0.1
+          energyPerBlow: 11.1
+          kellyRopeSpeed: 2.1
+          drillingTorque: 320.0
+          timestamp: 2023-04-23T18:25:43.511Z
+        - slewingGearAngle: 219.4
+          vibratorAmplitude: 2.3
+          concretePressure: 2.3
+          rotationSpeedCasing: 17.1
+          totalConcreteVolume: 17
+          crowdForce: 20.2
+          leaderInclinationX: -0.1
+          rotationSpeedRotaryDrive: 17.1
+          crowdSpeed: 120
+          vibratorFrequency: 2.3
+          rotationSpeedAuger: 17.1
+          rotationRate: 3
+          depth: 3.13
+          intrusion: 3
+          staticMoment: 2.3
+          relativeAugerPosition: 17
+          leaderInclinationY: -0.1
+          energyPerBlow: 11.1
+          kellyRopeSpeed: 2.1
+          drillingTorque: 320.0
+          timestamp: 2023-04-23T18:25:43.511Z
+        prevLink:
+          href: https://...
+        statistics:
+          totalPages: 7
+          pageSize: 5
+          currentPage: 2
+        nextLink:
+          href: https://...
+      properties:
+        dataSeries:
+          items:
+            $ref: '#/components/schemas/dataUnit'
+          title: dataSeries
+          type: array
+        statistics:
+          $ref: '#/components/schemas/statistics'
+        prevLink:
+          $ref: '#/components/schemas/link'
+        nextLink:
+          $ref: '#/components/schemas/link'
+      required:
+      - dataSeries
+      title: getdataSeries
+      type: object
+    dataSeries:
+      items:
+        $ref: '#/components/schemas/dataUnit'
+      title: dataSeries
+      type: array
+    dataUnit:
+      example:
+        slewingGearAngle: 219.4
+        vibratorAmplitude: 2.3
+        concretePressure: 2.3
+        rotationSpeedCasing: 17.1
+        totalConcreteVolume: 17
+        crowdForce: 20.2
+        leaderInclinationX: -0.1
+        rotationSpeedRotaryDrive: 17.1
+        crowdSpeed: 120
+        vibratorFrequency: 2.3
+        rotationSpeedAuger: 17.1
+        rotationRate: 3
+        depth: 3.13
+        intrusion: 3
+        staticMoment: 2.3
+        relativeAugerPosition: 17
+        leaderInclinationY: -0.1
+        energyPerBlow: 11.1
+        kellyRopeSpeed: 2.1
+        drillingTorque: 320.0
+        timestamp: 2023-04-23T18:25:43.511Z
+      properties:
+        timestamp:
+          description: The timestamp with timezone of this dataUnit
+          example: 2023-04-23T18:25:43.511Z
+          format: date-time
+          title: timestamp
+          type: string
+        depth:
+          description: "Depth measurement in meters with sign, <br> two decimal digits;<br>\
+            \ Operator obligation/reference point by operator/tool lower edge (drill\
+            \ bucket, auger); <br><br>  Agreement for working methods:<br> Kelly drilling\
+            \ <br>  Impact pile driving <br>  Continous flight auger drilling <br>\
+            \  Cased continous flight auger "
+          example: 3.13
+          title: depth
+          type: number
+        leaderInclinationX:
+          description: 'Inclination (longitudinal) (X-tilt mast) in degree with sign
+            <br> one decimal digit <br><br>  Agreement for working methods:<br> Kelly
+            drilling <br> Impact pile driving <br>  Continous flight auger drilling
+            <br>  Continous flight auger drilling <br> Full Displacement drilling
+            <br>  Cased continous flight auger '
+          example: -0.1
+          title: leaderInclinationX
+          type: number
+        leaderInclinationY:
+          description: 'Inclination (latitudinal) (Y-tilt mast)  in degree with sign
+            <br> one decimal digit <br><br>  Agreement for working methods:<br> Kelly
+            drilling <br> Impact pile driving <br>  Continous flight auger drilling
+            <br> Full Displacement drilling <br>  Cased continous flight auger  '
+          example: -0.1
+          title: leaderInclinationY
+          type: number
+        energyPerBlow:
+          description: "Energy of stroke in kNm (Energy/stroke; single stroke energy;\
+            \ single impact energy; for one stroke only) <br> one decimal digit  <br><br>\
+            \  Agreement for working methods: <br> Impact pile driving"
+          example: 11.1
+          title: energyPerBlow
+          type: number
+        slewingGearAngle:
+          description: 'Slewing gear <br> Alignment zero point; reporting aspect not
+            given; interesting for process tracking; slewing gear; turning gear; rotation
+            versus revelation speed <br> Swing angle angle in degrees with sign <br>Zero
+            point alignment <br> one decimal digit <br><br>  Agreement for working
+            methods:<br> Kelly drilling  <br>  Continous flight auger drilling <br>
+            Full Displacement drilling <br>  Cased continous flight auger  '
+          example: 219.4
+          title: slewingGearAngle
+          type: number
+        rotationSpeedRotaryDrive:
+          description: 'Drill rotation speed rpm with sign <br> one decimal digit
+            <br><br>  Agreement for working methods:<br> Kelly drilling <br> '
+          example: 17.1
+          title: rotationSpeedRotaryDrive
+          type: number
+        drillingTorque:
+          description: 'Drilling torque kNm with sign <br> with decimal place because
+            of small drilling rigs<br><br>  Agreement for working methods:<br> Kelly
+            drilling  <br>  Continous flight auger drilling <br> '
+          example: 320.0
+          title: drillingTorque
+          type: number
+        kellyRopeSpeed:
+          description: Drilling speed in m/min with sign (+ downwards/- upwards) <br>
+            one decimal digit <br> Kelly winch or main winch <br> Sign; speed of main
+            winch; Kelly Rope Speed  <br>  Agreement for working methods:<br> Kelly
+            drilling  <br> Continous flight auger drilling
+          example: 2.1
+          title: kellyRopeSpeed
+          type: number
+        crowdForce:
+          description: 'Crowd force in kN with sign (+ downwards/- upwards) <br> one
+            decimal digit <br> Contact force (bottom) versus crowd force (bottom/top);
+            independent of attachment and drilling equipment; crowd force is not the
+            force acting on the drilling tool tip or on the inserting element <br>
+            Contact force (bottom) versus feed force (bottom/top); independent of
+            attachment and drilling equipment; feed force is not the force acting
+            on the drilling tool tip or on the inserting element; feed force on the
+            carriage <br><br>  Agreement for working methods:<br> Kelly drilling <br>  Continous
+            flight auger drilling <br> Full Displacement drilling<br>  Cased continous
+            flight auger  '
+          example: 20.2
+          title: crowdForce
+          type: number
+        rotationRate:
+          description: "Drilling rate or drilling progress in U/m <br> Rotation rate\
+            \ versus Rotation per Meter versus drilling progress <br><br>  Agreement\
+            \ for working methods:  <br>  Continous flight auger drilling <br> Cased\
+            \ continous flight auger drilling  <br> Full Displacement drilling <br> "
+          example: 3
+          title: rotationRate
+          type: number
+        intrusion:
+          description: "[mm/U] versus [cm/U]; penetration versus intrusion<br><br>\
+            \  Agreement for working methods:  <br>  Continous flight auger drilling\
+            \ <br> Cased continous flight auger drilling  <br> Full Displacement drilling\
+            \ <br> <br> prio 1"
+          example: 3
+          title: intrusion
+          type: number
+        crowdSpeed:
+          description: "Leading sign; [cm/min] instead of [m/min]; without decimal\
+            \ places; reference point carriage versus cylinder <br>  Crowd speed in\
+            \ cm/min with sign (+ downwards/- upwards) <br> without decimal digit\
+            \ <br><br>  Agreement for working methods: <br> Continous flight auger\
+            \ drilling  <br>  Cased continous flight auger  <br> Full Displacement\
+            \ drilling <br> Vibro piling <br> Diaphragm wall cutting <br> Jet grouting\
+            \ <br> Anchor drilling <br> Wet soil mixing"
+          example: 120
+          title: crowdSpeed
+          type: number
+        totalConcreteVolume:
+          description: "Total concrete consumption in m3 <br> without decimal digit\
+            \ <br> accumulated after reset from start; accumulated value; more precise\
+            \ definition needed; pumped quantity (also before the start of concreting);\
+            \ filling of the core; concrete quantity measurement <br><br>  Agreement\
+            \ for working methods: <br> Continous flight auger drilling   <br>  Cased\
+            \ continous flight auger   <br> Full Displacement drilling <br> Jet grouting\
+            \ <br> Anchor drilling <br> Wet soil mixing"
+          example: 17
+          title: totalConcreteVolume
+          type: number
+        concretePressure:
+          description: "Concrete pressure in bar <br> without decimal digit <br> Measurement\
+            \ at the manifold <br><br>  Agreement for working methods: <br> Continous\
+            \ flight auger drilling <br>  Cased continous flight auger   <br> Full\
+            \ Displacement drilling <br> Jet grouting <br> Anchor drilling <br> Wet\
+            \ soil mixing "
+          example: 2.3
+          title: concretePressure
+          type: number
+        relativeAugerPosition:
+          description: "Sign; relative displacement [cm]; positive/negative; without\
+            \ decimal place; distinction between preliminary measurement and relative\
+            \ displacement; relative displacement via displacement measurement on\
+            \ cylinder; Relative displacement naming versus relative auger position\
+            \ <br><br>  Agreement for working methods: <br> Full Displacement drilling\
+            \ <br>  Cased continous flight auger  "
+          example: 17
+          title: relativeAugerPosition
+          type: number
+        rotationSpeedAuger:
+          description: "Drilling drive - auger <br><br>  Agreement for working methods:\
+            \ <br> Full Displacement drilling <br>  Cased continous flight auger "
+          example: 17.1
+          title: rotationSpeedAuger
+          type: number
+        rotationSpeedCasing:
+          description: "Drill rotation speed inner tube or rotation speed casing rpm\
+            \ with sign  <br> one decimal digit <br><br>  Agreement for working methods:\
+            \ <br> Full Displacement drilling <br>  Cased continous flight auger "
+          example: 17.1
+          title: rotationSpeedCasing
+          type: number
+        vibratorFrequency:
+          description: "Vibrator speed [rpm] versus frequency [Hz]; conversion <br><br>\
+            \  Agreement for working methods: <br> Vibro piling"
+          example: 2.3
+          title: vibratorFrequency
+          type: number
+        vibratorAmplitude:
+          description: "Vibration amplitude in mm of the vibro; Amplitude of vibrator;\
+            \ amplitude versus amplitude; preference for amplitude <br><br>  Agreement\
+            \ for working methods: <br> Vibro piling "
+          example: 2.3
+          title: vibratorAmplitude
+          type: number
+        staticMoment:
+          description: "Static momentum/unbalance in % of the vibro Designation: static\
+            \ moment; unbalance vibrator <br><br>  Agreement for working methods:\
+            \ <br> Vibro piling "
+          example: 2.3
+          title: staticMoment
+          type: number
+      required:
+      - timestamp
+      title: dataUnit
+      type: object
+    measurementPassUnit:
+      example:
+        depth: 17.1
+        deviationX: 2.1
+        rotationZ: 2.1
+        loweringSpeed: 2.1
+        deviationY: 2.1
+        inclinationX: 2.1
+        inclinationY: 2.1
+        timestamp: 2019-08-02T09:54:27.36Z
+      properties:
+        timestamp:
+          example: 2019-08-02T09:54:27.36Z
+          format: date-time
+          title: timestamp
+          type: string
+        depth:
+          description: "Depth measurement in meters with sign (+ down/-up), <br> two\
+            \ decimal digits;<br> Operator obligation/reference point by operator/tool\
+            \ lower edge (drill bucket, auger); <br><br>  Agreement for working methods:\
+            \ <br> Diaphragm wall grabing <br> Diaphragm wall cutting <br> prio 3"
+          example: 17.1
+          title: depth
+          type: number
+        loweringSpeed:
+          description: "Lowering speed in m/min with sign (+ down/-up), <br> one decimal\
+            \ digit;<br><br>  Agreement for working methods: <br> Diaphragm wall grabing\
+            \ <br> Diaphragm wall cutting <br> prio 3"
+          example: 2.1
+          title: loweringSpeed
+          type: number
+        deviationX:
+          description: "Deviation (longitudinal) in cm with sign <br> two decimal\
+            \ digits;<br><br>  Agreement for working methods: <br> Diaphragm wall\
+            \ grabing <br> Diaphragm wall cutting <br> prio 3"
+          example: 2.1
+          title: deviationX
+          type: number
+        deviationY:
+          description: "Deviation (latitudinal) in cm with sign <br> two decimal digits;<br><br>\
+            \  Agreement for working methods: <br> Diaphragm wall grabing <br> Diaphragm\
+            \ wall cutting <br> prio 3"
+          example: 2.1
+          title: deviationY
+          type: number
+        rotationZ:
+          description: "Rotation Z in degree with sign <br> two decimal digits;<br><br>\
+            \  Agreement for working methods: <br> Diaphragm wall grabing <br> Diaphragm\
+            \ wall cutting <br> prio 3"
+          example: 2.1
+          title: rotationZ
+          type: number
+        inclinationX:
+          description: "Inclination (longitudinal) in degree with sign <br> one decimal\
+            \ digit;<br><br>  Agreement for working methods: <br> Diaphragm wall grabing\
+            \ <br> Diaphragm wall cutting <br> prio 3"
+          example: 2.1
+          title: inclinationX
+          type: number
+        inclinationY:
+          description: "Inclination (latitudinal) in degree with sign <br> one decimal\
+            \ digit;<br><br>  Agreement for working methods: <br> Diaphragm wall grabing\
+            \ <br> Diaphragm wall cutting <br> prio 3"
+          example: 2.1
+          title: inclinationY
+          type: number
+      required:
+      - Timestamp
+      title: measurementPassUnit
+      type: object
+    eventDataUnit:
+      example:
+        statusEnd: 2023-04-23T18:25:43.511Z
+        statusStart: 2023-04-23T18:25:43.511Z
+        comment: comment
+      properties:
+        statusStart:
+          example: 2023-04-23T18:25:43.511Z
+          format: date-time
+          title: statusStart
+          type: string
+        statusEnd:
+          example: 2023-04-23T18:25:43.511Z
+          format: date-time
+          title: statusEnd
+          type: string
+        comment:
+          description: general comment
+          title: comment
+          type: string
+      title: eventDataUnit
+      type: object
+    link:
+      example:
+        href: https://...
+      properties:
+        href:
+          description: Hypermedia reference URL (href) is a rerence to another endpoint.
+            These references are provided that availavel data is discoverable by automated
+            systems. The reference should be an absolute URL
+          example: https://...
+          title: href
+          type: string
+      title: link
+      type: object
+    statistics:
+      example:
+        totalPages: 7
+        pageSize: 5
+        currentPage: 2
+      properties:
+        totalPages:
+          example: 7
+          title: totalPages
+          type: number
+        pageSize:
+          example: 5
+          title: pageSize
+          type: number
+        currentPage:
+          example: 2
+          title: currentPage
+          type: number
+      title: statistics
+      type: object
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      type: http
