@@ -35,3 +35,7 @@ uvloop
 watchgod
 websockets
 uvicorn
+python-dotenv
+jwt
+python-jose
+
