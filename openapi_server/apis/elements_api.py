@@ -1,12 +1,14 @@
 # coding: utf-8
-
+import logging
 from typing import Dict, List  # noqa: F401
 import importlib
 import pkgutil
 import httpx
 from openapi_server.apis.elements_api_base import BaseElementsApi
 import openapi_server.impl
-
+import requests
+from fastapi import Depends, HTTPException, Path, Query, Security
+import requests
 from fastapi import (  # noqa: F401
     APIRouter,
     Body,
@@ -86,37 +88,77 @@ async def login(form_data: CustomLoginForm = Depends()):
 async def get_info(token_info: dict= Depends(get_token_bearer)):
     return token_info
     
-                
-   
+customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
+tenant_base_url = "https://dacs.site/api/tenant/devices" 
 
-
+def get_info_token(token_info: dict= Depends(get_token_bearer)):
+    return token_info
 @router.get(
     "/Fleet/Equipment/{oemISOidentifier}/elements",
-    responses={
-        200: {"model": ElementShortList, "description": "Successful operation"},
-        400: {"description": "Invalid parameter supplied"},
-        404: {"description": "No element(s) found"},
-    },
+    # responses={
+    #     200: {"model": ElementShortList, "description": "Successful operation"},
+    #     400: {"description": "Invalid parameter supplied"},
+    #     404: {"description": "No element(s) found"},
+    # },
     tags=["Elements"],
-    summary="Get all element_uid&#39;s between start and end date",
-    response_model_by_alias=True,
+    summary="Get all element_uid's between start and end date",
+    # response_model_by_alias=True,
 )
 async def get_elements_by_startdate_and_enddate(
     oemISOidentifier: str = Path(..., description="OEM ISO identifier, as defined in ISO 15143-3"),
     start_date: str = Query(None, description="Start time/date in UTC format", alias="start-date"),
     end_date: str = Query(None, description="End time/date in UTC format", alias="end-date"),
     page_number: int = Query(None, description="Page number, starting from 1", alias="page-number"),
-    token_bearer: TokenModel = Security(
-        get_token_bearer
-    ),
-) -> ElementShortList:
-    """Returns all available elementids with names between start and endDate"""
-    if not BaseElementsApi.subclasses:
-        raise HTTPException(status_code=500, detail="Not implemented")
-    return await BaseElementsApi.subclasses[0]().get_elements_by_startdate_and_enddate(oemISOidentifier, start_date, end_date, page_number)
+    token_bearer: TokenModel = Security(get_token_bearer)):
+    # ,
+# ) -> ElementShortList:
+    
+   
+    """Returns all available element IDs with names between start and endDate"""
 
 
 
+    token_info = token_bearer
+    tenant_admin = token_info.get("tenant_admin")
+    customer_id = token_info.get("customer_id")
+
+    headers = {"Authorization": f"Bearer {token_info['token']}"}
+
+    if tenant_admin:
+        device_name = oemISOidentifier
+        tenant_url = tenant_base_url + f"?deviceName={device_name}"
+        response = requests.get(tenant_url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            print("Received data:", data)
+            logging.debug("Received data: %s", data)
+            # return ElementShortList(**data)
+            return data
+        elif response.status_code == 404:
+            raise HTTPException(status_code=404, detail="No element(s) found")
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+    else:
+        page_size = 1
+        page = page_number
+        text_search = oemISOidentifier
+        customer_url = customer_base_url.format(customerId=customer_id)
+        params = {
+            "pageSize": page_size,
+            "page": page,
+            "textSearch": text_search
+        }
+        response = requests.get(url=customer_url, headers=headers, params=params)
+
+        if response.status_code == 200:
+            data = response.json()
+            # return ElementShortList(**data)
+            return response
+        elif response.status_code == 404:
+            raise HTTPException(status_code=404, detail="No element(s) found")
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
 
 
 
