@@ -23,7 +23,7 @@ from fastapi import (  # noqa: F401
     Security,
     status,
 )
-
+from collections import OrderedDict
 from openapi_server.models.extra_models import TokenModel  # noqa: F401
 from openapi_server.models.element import Element
 from openapi_server.models.element_short_list import ElementShortList
@@ -74,15 +74,16 @@ async def login(form_data: CustomLoginForm = Depends()):
         return {"token": toker_global}
     
 
-    # return {
-    #     "token": token,
-    #     "tenant_admin": tenant_admin,
-    #     "customer_id": customer_id,
-    #     "user_id": user_id,
-    #     "name": f"{first_name} {last_name}"
-    # }
 
+asset_ids = []
+to_assets = []
+asset_ids_list=list(OrderedDict.fromkeys(asset_ids))
+to_assets_list =list(OrderedDict.fromkeys(to_assets))
 
+customerId = None
+device_name = None
+entityProfile = None
+deviceId = None
 
 @router.get("/get_token_info")
 async def get_info(token_info: dict= Depends(get_token_bearer)):
@@ -90,6 +91,7 @@ async def get_info(token_info: dict= Depends(get_token_bearer)):
     
 customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
 tenant_base_url = "https://dacs.site/api/tenant/devices" 
+relationsDevice2Asset = "https://dacs.site/api/relations?fromId={YOUR_DEVICE_ID}&fromType=DEVICE"
 
 def get_info_token(token_info: dict= Depends(get_token_bearer)):
     return token_info
@@ -123,22 +125,59 @@ async def get_elements_by_startdate_and_enddate(
     customer_id = token_info.get("customer_id")
 
     headers = {"Authorization": f"Bearer {token_info['token']}"}
+    
 
     if tenant_admin:
         device_name = oemISOidentifier
         tenant_url = tenant_base_url + f"?deviceName={device_name}"
         response = requests.get(tenant_url, headers=headers)
-        
+        deviceId = None 
         if response.status_code == 200:
             data = response.json()
             print("Received data:", data)
             logging.debug("Received data: %s", data)
-            # return ElementShortList(**data)
-            return data
-        elif response.status_code == 404:
-            raise HTTPException(status_code=404, detail="No element(s) found")
+            if data.get("customerId") is not None:
+                 customerId = data.get("customerId").get("id")
+            device_name = data.get("name") 
+            if data.get("deviceProfileId") is not None:
+                entityProfile = data.get("deviceProfileId").get("id")  
+            if data.get("id")is not None:
+                deviceId=data.get("id").get("id")
+            
+            relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+
+
+            payload = {
+                "parameters": {
+                    "fromId": deviceId,           # Ensure deviceId is correctly assigned
+                    "fromType": "DEVICE",
+                    "toType": "ASSET",
+                    "direction": "FROM"           # Use "FROM" as per API requirements
+                }
+            }
+
+            responseFromDevice = requests.get(relationsDevice_url, headers=headers)
+            if responseFromDevice.status_code == 200:
+                relations = responseFromDevice.json()
+                for rel in relations:
+                    if rel['to']['entityType'] == 'ASSET':
+                        asset_id = rel['to']['id']
+                        to_assest=rel['to']
+                        if asset_id not in asset_ids:
+                     
+                            asset_ids.append(asset_id)
+                        if to_assest not in to_assets:
+
+                            to_assets.append(to_assest)
+                return asset_ids
+            else:
+                print("Error:", responseFromDevice.status_code, responseFromDevice.text)
+                raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
         else:
+            print("Error:", response.status_code, response.text)
             raise HTTPException(status_code=response.status_code, detail=response.text)
+
+   
     else:
         page_size = 1
         page = page_number
@@ -149,12 +188,22 @@ async def get_elements_by_startdate_and_enddate(
             "page": page,
             "textSearch": text_search
         }
+
         response = requests.get(url=customer_url, headers=headers, params=params)
 
         if response.status_code == 200:
             data = response.json()
-            # return ElementShortList(**data)
-            return response
+            print("Received data:", data)
+            logging.debug("Received data: %s", data)
+            if data.get("customerId") is not None:
+               customerId = data.get("customerId").get("id")
+            device_name = data.get("name") 
+            if data.get("deviceProfileId") is not None:
+                entityProfile = data.get("deviceProfileId").get("id")  
+            if data.get("deviceId")is not None:
+                deviceId=data.get("deviceId").get("id")
+    
+            return deviceId
         elif response.status_code == 404:
             raise HTTPException(status_code=404, detail="No element(s) found")
         else:
