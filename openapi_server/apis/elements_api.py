@@ -187,9 +187,10 @@ async def get_elements_by_startdate_and_enddate(
                         assert_infos.append(assert_info)
 
                         created_time =assert_info.get("createdTime")
-                        filtered_assets = [asset for asset in assert_info if start_time_millis<= created_time <= end_time_millis]
-                        asset_name =[asset['name'] for asset in filtered_assets]
-                        asset_names.append(asset_name)
+                        # for object_ in  assert_infos:
+                        
+                    
+                       
                         print("Filtered Asset Names:", asset_names)
                     else:
                         print("Error:", response.status_code, response.text)
