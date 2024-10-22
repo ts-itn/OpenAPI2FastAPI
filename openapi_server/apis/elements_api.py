@@ -37,6 +37,7 @@ from dotenv import load_dotenv
 import os
 from fastapi.security import HTTPBearer
 
+from datetime import datetime
 
 load_dotenv()
 router = APIRouter()
@@ -77,6 +78,9 @@ async def login(form_data: CustomLoginForm = Depends()):
 
 asset_ids = []
 to_assets = []
+assert_infos=[]
+filtered_assets=[]
+asset_names=[]
 asset_ids_list=list(OrderedDict.fromkeys(asset_ids))
 to_assets_list =list(OrderedDict.fromkeys(to_assets))
 
@@ -92,6 +96,8 @@ async def get_info(token_info: dict= Depends(get_token_bearer)):
 customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
 tenant_base_url = "https://dacs.site/api/tenant/devices" 
 relationsDevice2Asset = "https://dacs.site/api/relations?fromId={YOUR_DEVICE_ID}&fromType=DEVICE"
+asset_details_url = "https://dacs.site/api/asset/{assetId}"
+
 
 def get_info_token(token_info: dict= Depends(get_token_bearer)):
     return token_info
@@ -118,7 +124,11 @@ async def get_elements_by_startdate_and_enddate(
    
     """Returns all available element IDs with names between start and endDate"""
 
+    utc_time_start = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+    start_time_millis = int(utc_time_start.timestamp() * 1000)
 
+    utc_time_stop = datetime.strptime(end_date,  "%Y-%m-%dT%H:%M:%S.%fZ")
+    end_time_millis = int(utc_time_stop.timestamp() * 1000)
 
     token_info = token_bearer
     tenant_admin = token_info.get("tenant_admin")
@@ -169,7 +179,28 @@ async def get_elements_by_startdate_and_enddate(
                         if to_assest not in to_assets:
 
                             to_assets.append(to_assest)
-                return asset_ids
+                for asset_id in asset_ids:
+                    ulr_assets=asset_details_url.format(assetId=asset_id)
+                    reponse_asset=requests.get(url=ulr_assets, headers=headers)
+                    if reponse_asset.status_code ==200:
+                        assert_info =reponse_asset.json()
+                        assert_infos.append(assert_info)
+
+                        created_time =assert_info.get("createdTime")
+                        filtered_assets = [asset for asset in assert_info if start_time_millis<= created_time <= end_time_millis]
+                        asset_name =[asset['name'] for asset in filtered_assets]
+                        asset_names.append(asset_name)
+                        print("Filtered Asset Names:", asset_names)
+                    else:
+                        print("Error:", response.status_code, response.text)
+                        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+                        
+
+                        
+
+
+                return assert_infos
             else:
                 print("Error:", responseFromDevice.status_code, responseFromDevice.text)
                 raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
