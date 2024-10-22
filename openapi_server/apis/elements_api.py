@@ -77,6 +77,8 @@ async def login(form_data: CustomLoginForm = Depends()):
 
 
 asset_ids = []
+
+
 to_assets = []
 assert_infos=[]
 filtered_assets=[]
@@ -144,7 +146,7 @@ async def get_elements_by_startdate_and_enddate(
         deviceId = None 
         if response.status_code == 200:
             data = response.json()
-            print("Received data:", data)
+            # print("Received data:", data)
             logging.debug("Received data: %s", data)
             if data.get("customerId") is not None:
                  customerId = data.get("customerId").get("id")
@@ -185,10 +187,14 @@ async def get_elements_by_startdate_and_enddate(
                     if reponse_asset.status_code ==200:
                         assert_info =reponse_asset.json()
                         assert_infos.append(assert_info)
-
-                        created_time =assert_info.get("createdTime")
-                        # for object_ in  assert_infos:
-                        
+                        for asset_info in assert_infos:
+                            created_time = asset_info.get("createdTime")
+                            if start_time_millis <= created_time <= end_time_millis:
+                                name = asset_info.get("name")
+                                if name not in asset_names:
+                                    asset_names.append(name)
+                                
+                                #### Check is better there chould be problem                 
                     
                        
                         print("Filtered Asset Names:", asset_names)
@@ -201,7 +207,7 @@ async def get_elements_by_startdate_and_enddate(
                         
 
 
-                return assert_infos
+                return asset_names
             else:
                 print("Error:", responseFromDevice.status_code, responseFromDevice.text)
                 raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
