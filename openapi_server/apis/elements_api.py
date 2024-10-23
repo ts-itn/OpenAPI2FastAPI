@@ -38,6 +38,7 @@ import os
 from fastapi.security import HTTPBearer
 
 from datetime import datetime
+import math
 
 load_dotenv()
 router = APIRouter()
@@ -87,6 +88,10 @@ customerId = None
 device_name = None
 entityProfile = None
 deviceId = None
+shortList=[]
+
+
+
 
 @router.get("/get_token_info")
 async def get_info(token_info: dict= Depends(get_token_bearer)):
@@ -103,7 +108,7 @@ asset_telemetry_url = (
     # "&interval={interval}&limit={limit}&agg={agg}&orderBy={orderBy}"
     ### Limit can be used for page 
 )
-telemetry_keys = ["pfahl", "gnummer", "s_index"]
+telemetry_keys = ["pfahl", "s_index", "dw_counter"]
 keys_str = ",".join(telemetry_keys)  # Converts to "pfahl"
  
 
@@ -141,10 +146,11 @@ async def get_elements_by_startdate_and_enddate(
     token_info = token_bearer
     tenant_admin = token_info.get("tenant_admin")
     customer_id = token_info.get("customer_id")
-
     headers = {"Authorization": f"Bearer {token_info['token']}"}
-    
- 
+
+
+
+
     if tenant_admin:
         device_name = oemISOidentifier
         tenant_url = tenant_base_url + f"?deviceName={device_name}"
@@ -166,11 +172,7 @@ async def get_elements_by_startdate_and_enddate(
 
 
             payload = {
-                "parameters": {
-                    "fromId": deviceId,           # Ensure deviceId is correctly assigned
-                    "fromType": "DEVICE",
-                    "toType": "ASSET",
-                    "direction": "FROM"           # Use "FROM" as per API requirements
+                "parameters": {"fromId": deviceId, "fromType": "DEVICE","toType": "ASSET",  "direction": "FROM"           # Use "FROM" as per API requirements
                 }
             }
 
@@ -190,18 +192,18 @@ async def get_elements_by_startdate_and_enddate(
 
 
                             ####  
-                for asset_id in asset_ids:
-                    ulr_assets=asset_details_url.format(assetId=asset_id)
-                    reponse_asset=requests.get(url=ulr_assets, headers=headers)
-                    if reponse_asset.status_code ==200:
-                        assert_info =reponse_asset.json()
-                        assert_infos.append(assert_info)
-                        for asset_info in assert_infos:
-                            created_time = asset_info.get("createdTime")
-                            if start_time_millis <= created_time <= end_time_millis:
-                                name = asset_info.get("name")
-                                if name not in asset_names:
-                                    asset_names.append(name)
+                # for asset_id in asset_ids:
+                #     ulr_assets=asset_details_url.format(assetId=asset_id)
+                #     reponse_asset=requests.get(url=ulr_assets, headers=headers)
+                #     if reponse_asset.status_code ==200:
+                #         assert_info =reponse_asset.json()
+                #         assert_infos.append(assert_info)
+                #         for asset_info in assert_infos:
+                #             created_time = asset_info.get("createdTime")
+                #             if start_time_millis <= created_time <= end_time_millis:
+                #                 name = asset_info.get("name")
+                #                 if name not in asset_names:
+                #                     asset_names.append(name)
                                 
                 for asset_id in asset_ids:
                     keys_str = ",".join(telemetry_keys)
@@ -217,17 +219,45 @@ async def get_elements_by_startdate_and_enddate(
                     
                     if response_asset_telemetry.status_code == 200:
                         telemetry = response_asset_telemetry.json()
-                        assert_telemetries.append(telemetry)                 
+                        assert_telemetries.append(telemetry)
+                        shortList = [
+                                        {
+                                            "elementName": f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}",
+                                            "elementUid": telemetry['pfahl'][0]['value']
+                                        }
+                                            for telemetry in assert_telemetries
+                                        ]  
+                        shortList_len=len(shortList)
+                        totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
+                        page_size = 100
+
+                        page= int(shortList_len/ page_size) +1
+                        statistics = {
+                                    "totalPages": totalPages, 
+                                    "pageSize":shortList_len,
+                                    "currentPage":page
+                                
+                                }
+                        combined_data = {
+                            "ShortList": shortList,
+                            "statistics": statistics,
+                            "prevLink": {"href": ""},
+                            "nextLink": {"href": ""}
+                                            }
+                     
+
+                                       
                     else:
                         print("Error:", response_asset_telemetry.status_code, response_asset_telemetry.text)
                         raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
+                    
 
                         
 
                         
 
 
-                return assert_telemetries
+                return combined_data
             else:
                 print("Error:", responseFromDevice.status_code, responseFromDevice.text)
                 raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
@@ -241,6 +271,7 @@ async def get_elements_by_startdate_and_enddate(
         page = page_number
         text_search = oemISOidentifier
         customer_url = customer_base_url.format(customerId=customer_id)
+
         params = {
             "pageSize": page_size,
             "page": page,
