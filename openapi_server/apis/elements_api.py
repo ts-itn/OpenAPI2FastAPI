@@ -139,14 +139,14 @@ def get_info_token(token_info: dict= Depends(get_token_bearer)):
     return token_info
 @router.get(
     "/Fleet/Equipment/{oemISOidentifier}/elements",
-    # responses={
-    #     200: {"model": ElementShortList, "description": "Successful operation"},
-    #     400: {"description": "Invalid parameter supplied"},
-    #     404: {"description": "No element(s) found"},
-    # },
+    responses={
+        200: {"model": ElementShortList, "description": "Successful operation"},
+        400: {"description": "Invalid parameter supplied"},
+        404: {"description": "No element(s) found"},
+    },
     tags=["Elements"],
     summary="Get all element_uid's between start and end date",
-    # response_model_by_alias=True,
+    response_model_by_alias=True,
 )
 async def get_elements_by_startdate_and_enddate(
     oemISOidentifier: str = Path(..., description="OEM ISO identifier, as defined in ISO 15143-3"),
@@ -259,8 +259,8 @@ async def get_elements_by_startdate_and_enddate(
                         combined_data = {
                             "ShortList": shortList_return,
                             "statistics": statistics,
-                            "prevLink": {"href": ""},
-                            "nextLink": {"href": ""}
+                            "prevLink": {"href": "string"},
+                            "nextLink": {"href": "string"}
                                             }
                        
                      
