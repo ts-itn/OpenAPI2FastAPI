@@ -89,6 +89,29 @@ device_name = None
 entityProfile = None
 deviceId = None
 shortList=[]
+seen =set()
+def paginate_list(data_list, page_number, page_size=100):
+    start_index = (page_number - 1) * page_size
+    end_index = start_index + page_size
+    paginated_list = data_list[start_index:end_index]
+    if not paginated_list and page_number != 1:
+        return "No items to display. Page number may be out of range.", []
+    return paginated_list, len(data_list)
+
+
+
+page_number = 1  # This can be dynamically changed as needed
+page_size = 100  # You can adjust this size based on your requirements
+
+shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+print("Paginated List:", shortList_return)
+print("Total Number of Items in List:", shortList_len)
+
+
+
+
+
+
 
 
 
@@ -130,12 +153,12 @@ async def get_elements_by_startdate_and_enddate(
     start_date: str = Query(None, description="Start time/date in UTC format", alias="start-date"),
     end_date: str = Query(None, description="End time/date in UTC format", alias="end-date"),
     page_number: int = Query(None, description="Page number, starting from 1", alias="page-number"),
-    token_bearer: TokenModel = Security(get_token_bearer)):
-    # ,
-# ) -> ElementShortList:
+    token_bearer: TokenModel = Security(
+        get_token_bearer
+    ),
+) -> ElementShortList:
     
-   
-    """Returns all available element IDs with names between start and endDate"""
+  
 
     utc_time_start = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%fZ")
     start_time_millis = int(utc_time_start.timestamp() * 1000)
@@ -147,9 +170,6 @@ async def get_elements_by_startdate_and_enddate(
     tenant_admin = token_info.get("tenant_admin")
     customer_id = token_info.get("customer_id")
     headers = {"Authorization": f"Bearer {token_info['token']}"}
-
-
-
 
     if tenant_admin:
         device_name = oemISOidentifier
@@ -175,7 +195,6 @@ async def get_elements_by_startdate_and_enddate(
                 "parameters": {"fromId": deviceId, "fromType": "DEVICE","toType": "ASSET",  "direction": "FROM"           # Use "FROM" as per API requirements
                 }
             }
-
             responseFromDevice = requests.get(relationsDevice_url, headers=headers)
             if responseFromDevice.status_code == 200:
                 relations = responseFromDevice.json()
@@ -189,21 +208,6 @@ async def get_elements_by_startdate_and_enddate(
                         if to_assest not in to_assets:
 
                             to_assets.append(to_assest)
-
-
-                            ####  
-                # for asset_id in asset_ids:
-                #     ulr_assets=asset_details_url.format(assetId=asset_id)
-                #     reponse_asset=requests.get(url=ulr_assets, headers=headers)
-                #     if reponse_asset.status_code ==200:
-                #         assert_info =reponse_asset.json()
-                #         assert_infos.append(assert_info)
-                #         for asset_info in assert_infos:
-                #             created_time = asset_info.get("createdTime")
-                #             if start_time_millis <= created_time <= end_time_millis:
-                #                 name = asset_info.get("name")
-                #                 if name not in asset_names:
-                #                     asset_names.append(name)
                                 
                 for asset_id in asset_ids:
                     keys_str = ",".join(telemetry_keys)
@@ -214,36 +218,51 @@ async def get_elements_by_startdate_and_enddate(
                         end_date=end_time_millis,
                       
                     ) 
-                    print(f"Requesting URL: {url_assets_telemetry}")  # Debugging line
+                  
                     response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
                     
                     if response_asset_telemetry.status_code == 200:
                         telemetry = response_asset_telemetry.json()
                         assert_telemetries.append(telemetry)
-                        shortList = [
-                                        {
-                                            "elementName": f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}",
-                                            "elementUid": telemetry['pfahl'][0]['value']
-                                        }
-                                            for telemetry in assert_telemetries
-                                        ]  
+
+                        for telemetry in assert_telemetries:
+
+                            elementName = f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}"
+                            elementUid = telemetry['pfahl'][0]['value']
+                            indentifier=(elementName, elementUid)
+
+                            if indentifier not in seen:
+                                seen.add(indentifier)
+                                shortList.append({
+                                    "elementName": elementName,
+                                    "elementUid": elementUid
+                                }
+                                )
+
+                  
                         shortList_len=len(shortList)
+                        
                         totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
                         page_size = 100
+                        shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
 
-                        page= int(shortList_len/ page_size) +1
+                      
+                       
+
+                        page= int(page_number/ page_size) +1
                         statistics = {
                                     "totalPages": totalPages, 
                                     "pageSize":shortList_len,
-                                    "currentPage":page
+                                    "currentPage":page_number
                                 
                                 }
                         combined_data = {
-                            "ShortList": shortList,
+                            "ShortList": shortList_return,
                             "statistics": statistics,
                             "prevLink": {"href": ""},
                             "nextLink": {"href": ""}
                                             }
+                       
                      
 
                                        
