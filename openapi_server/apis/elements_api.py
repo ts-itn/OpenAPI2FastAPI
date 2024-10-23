@@ -77,14 +77,11 @@ async def login(form_data: CustomLoginForm = Depends()):
 
 
 asset_ids = []
-
-
 to_assets = []
 assert_infos=[]
 filtered_assets=[]
 asset_names=[]
-asset_ids_list=list(OrderedDict.fromkeys(asset_ids))
-to_assets_list =list(OrderedDict.fromkeys(to_assets))
+assert_telemetries = []
 
 customerId = None
 device_name = None
@@ -94,12 +91,21 @@ deviceId = None
 @router.get("/get_token_info")
 async def get_info(token_info: dict= Depends(get_token_bearer)):
     return token_info
-    
+
+
 customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
 tenant_base_url = "https://dacs.site/api/tenant/devices" 
 relationsDevice2Asset = "https://dacs.site/api/relations?fromId={YOUR_DEVICE_ID}&fromType=DEVICE"
 asset_details_url = "https://dacs.site/api/asset/{assetId}"
-
+asset_telemetry_url = (
+    "https://dacs.site/api/plugins/telemetry/ASSET/{assetId}/values/timeseries"
+    "?keys={telemetry_keys}&startTs={start_date}&endTs={end_date}"
+    # "&interval={interval}&limit={limit}&agg={agg}&orderBy={orderBy}"
+    ### Limit can be used for page 
+)
+telemetry_keys = ["pfahl", "gnummer", "s_index"]
+keys_str = ",".join(telemetry_keys)  # Converts to "pfahl"
+ 
 
 def get_info_token(token_info: dict= Depends(get_token_bearer)):
     return token_info
@@ -138,7 +144,7 @@ async def get_elements_by_startdate_and_enddate(
 
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     
-
+ 
     if tenant_admin:
         device_name = oemISOidentifier
         tenant_url = tenant_base_url + f"?deviceName={device_name}"
@@ -181,6 +187,9 @@ async def get_elements_by_startdate_and_enddate(
                         if to_assest not in to_assets:
 
                             to_assets.append(to_assest)
+
+
+                            ####  
                 for asset_id in asset_ids:
                     ulr_assets=asset_details_url.format(assetId=asset_id)
                     reponse_asset=requests.get(url=ulr_assets, headers=headers)
@@ -194,20 +203,31 @@ async def get_elements_by_startdate_and_enddate(
                                 if name not in asset_names:
                                     asset_names.append(name)
                                 
-                                #### Check is better there chould be problem                 
+                for asset_id in asset_ids:
+                    keys_str = ",".join(telemetry_keys)
+                    url_assets_telemetry = asset_telemetry_url.format(
+                        assetId=asset_id, 
+                        telemetry_keys=keys_str,
+                        start_date=start_time_millis,
+                        end_date=end_time_millis,
+                      
+                    ) 
+                    print(f"Requesting URL: {url_assets_telemetry}")  # Debugging line
+                    response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
                     
-                       
-                        print("Filtered Asset Names:", asset_names)
+                    if response_asset_telemetry.status_code == 200:
+                        telemetry = response_asset_telemetry.json()
+                        assert_telemetries.append(telemetry)                 
                     else:
-                        print("Error:", response.status_code, response.text)
-                        raise HTTPException(status_code=response.status_code, detail=response.text)
+                        print("Error:", response_asset_telemetry.status_code, response_asset_telemetry.text)
+                        raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
 
                         
 
                         
 
 
-                return asset_names
+                return assert_telemetries
             else:
                 print("Error:", responseFromDevice.status_code, responseFromDevice.text)
                 raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
@@ -241,7 +261,7 @@ async def get_elements_by_startdate_and_enddate(
             if data.get("deviceId")is not None:
                 deviceId=data.get("deviceId").get("id")
     
-            return deviceId
+            return "Hello"
         elif response.status_code == 404:
             raise HTTPException(status_code=404, detail="No element(s) found")
         else:
