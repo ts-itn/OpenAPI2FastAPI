@@ -171,118 +171,114 @@ async def get_elements_by_startdate_and_enddate(
     customer_id = token_info.get("customer_id")
     headers = {"Authorization": f"Bearer {token_info['token']}"}
 
+
     if tenant_admin:
-        device_name = oemISOidentifier
-        tenant_url = tenant_base_url + f"?deviceName={device_name}"
-        response = requests.get(tenant_url, headers=headers)
-        deviceId = None 
-        if response.status_code == 200:
-            data = response.json()
-            # print("Received data:", data)
-            logging.debug("Received data: %s", data)
-            if data.get("customerId") is not None:
-                 customerId = data.get("customerId").get("id")
-            device_name = data.get("name") 
-            if data.get("deviceProfileId") is not None:
-                entityProfile = data.get("deviceProfileId").get("id")  
-            if data.get("id")is not None:
-                deviceId=data.get("id").get("id")
-            
-            relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+        try:
+            device_name = oemISOidentifier
+            tenant_url = tenant_base_url + f"?deviceName={device_name}"
+            response = requests.get(tenant_url, headers=headers)
+            deviceId = None 
+            if response.status_code == 200:
+                data = response.json()
+                # print("Received data:", data)
+                logging.debug("Received data: %s", data)
+                if data.get("customerId") is not None:
+                    customerId = data.get("customerId").get("id")
+                device_name = data.get("name") 
+                if data.get("deviceProfileId") is not None:
+                    entityProfile = data.get("deviceProfileId").get("id")  
+                if data.get("id") is not None:
+                    deviceId = data.get("id").get("id")
+                
+                relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
 
-
-            payload = {
-                "parameters": {"fromId": deviceId, "fromType": "DEVICE","toType": "ASSET",  "direction": "FROM"           # Use "FROM" as per API requirements
+                payload = {
+                    "parameters": {
+                        "fromId": deviceId, 
+                        "fromType": "DEVICE",
+                        "toType": "ASSET",  
+                        "direction": "FROM"  # Use "FROM" as per API requirements
+                    }
                 }
-            }
-            responseFromDevice = requests.get(relationsDevice_url, headers=headers)
-            if responseFromDevice.status_code == 200:
-                relations = responseFromDevice.json()
-                for rel in relations:
-                    if rel['to']['entityType'] == 'ASSET':
-                        asset_id = rel['to']['id']
-                        to_assest=rel['to']
-                        if asset_id not in asset_ids:
-                     
-                            asset_ids.append(asset_id)
-                        if to_assest not in to_assets:
+                responseFromDevice = requests.get(relationsDevice_url, headers=headers)
+                if responseFromDevice.status_code == 200:
+                    relations = responseFromDevice.json()
+                    for rel in relations:
+                        if rel['to']['entityType'] == 'ASSET':
+                            asset_id = rel['to']['id']
+                            to_assest = rel['to']
+                            if asset_id not in asset_ids:
+                                asset_ids.append(asset_id)
+                            if to_assest not in to_assets:
+                                to_assets.append(to_assest)
+                                    
+                    for asset_id in asset_ids:
+                        keys_str = ",".join(telemetry_keys)
+                        url_assets_telemetry = asset_telemetry_url.format(
+                            assetId=asset_id, 
+                            telemetry_keys=keys_str,
+                            start_date=start_time_millis,
+                            end_date=end_time_millis,
+                        ) 
+                        response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
+                        if response_asset_telemetry.status_code == 200:
+                            telemetry = response_asset_telemetry.json()
+                            assert_telemetries.append(telemetry)
+                            for telemetry in assert_telemetries:
+                                elementName = f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}"
+                                elementUid = telemetry['pfahl'][0]['value']
+                                identifier = (elementName, elementUid)
+                                if identifier not in seen:
+                                    seen.add(identifier)
+                                    shortList.append({
+                                        "elementName": elementName,
+                                        "elementUid": elementUid
+                                    })
+                            shortList_len = len(shortList)
+                            totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
+                            page_size = 100
 
-                            to_assets.append(to_assest)
-                                
-                for asset_id in asset_ids:
-                    keys_str = ",".join(telemetry_keys)
-                    url_assets_telemetry = asset_telemetry_url.format(
-                        assetId=asset_id, 
-                        telemetry_keys=keys_str,
-                        start_date=start_time_millis,
-                        end_date=end_time_millis,
-                      
-                    ) 
-                  
-                    response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
-                    
-                    if response_asset_telemetry.status_code == 200:
-                        telemetry = response_asset_telemetry.json()
-                        assert_telemetries.append(telemetry)
-
-                        for telemetry in assert_telemetries:
-
-                            elementName = f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}"
-                            elementUid = telemetry['pfahl'][0]['value']
-                            indentifier=(elementName, elementUid)
-
-                            if indentifier not in seen:
-                                seen.add(indentifier)
-                                shortList.append({
-                                    "elementName": elementName,
-                                    "elementUid": elementUid
-                                }
+                            if page_number > totalPages:
+                                (
+                                    "Requested page number %s exceeds total pages %s",
+                                    page_number, totalPages
                                 )
+                                raise HTTPException(  status_code =400, 
+                                    detail=f"Page number {page_number} exceeds total pages {totalPages}"
 
-                  
-                        shortList_len=len(shortList)
-                        
-                        totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
-                        page_size = 100
-                        shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-
-                      
-                       
-
-                        page= int(page_number/ page_size) +1
-                        statistics = {
-                                    "totalPages": totalPages, 
-                                    "pageSize":shortList_len,
-                                    "currentPage":page_number
-                                
-                                }
-                        combined_data = {
-                            "ShortList": shortList_return,
-                            "statistics": statistics,
-                            "prevLink": {"href": "string"},
-                            "nextLink": {"href": "string"}
-                                            }
-                       
-                     
-
-                                       
-                    else:
-                        print("Error:", response_asset_telemetry.status_code, response_asset_telemetry.text)
-                        raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
-                    
-
-                        
-
-                        
-
-
-                return combined_data
+                                )
+                            shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+                            page = int(page_number / page_size) + 1
+                            statistics = {
+                                "totalPages": totalPages, 
+                                "pageSize": shortList_len,
+                                "currentPage": page_number
+                            }
+                            combined_data = {
+                                "ShortList": shortList_return,
+                                "statistics": statistics,
+                                "prevLink": {"href": "string"},
+                                "nextLink": {"href": "string"}
+                            }
+                        else:
+                            logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
+                            raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
+                    return combined_data
+                else:
+                    logging.error("Error in device relations response: %s - %s", responseFromDevice.status_code, responseFromDevice.text)
+                    raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
             else:
-                print("Error:", responseFromDevice.status_code, responseFromDevice.text)
-                raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
-        else:
-            print("Error:", response.status_code, response.text)
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+                logging.error("Error in tenant URL response: %s - %s", response.status_code, response.text)
+                raise HTTPException(status_code=response.status_code, detail=response.text)
+        except Exception as e:
+            # Log the exception with traceback for debugging
+            logging.exception("An unexpected error occurred: %s", e)
+            # Return a generic error message
+            detail_message = str(e) if str(e).strip() else "Not implemented"
+            raise HTTPException(status_code=501, detail=detail_message)
+
+
+
 
    
     else:
