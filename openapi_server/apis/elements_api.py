@@ -109,13 +109,6 @@ print("Total Number of Items in List:", shortList_len)
 
 
 
-
-
-
-
-
-
-
 @router.get("/get_token_info")
 async def get_info(token_info: dict= Depends(get_token_bearer)):
     return token_info
@@ -155,7 +148,7 @@ async def get_elements_by_startdate_and_enddate(
     page_number: int = Query(None, description="Page number, starting from 1", alias="page-number"),
     token_bearer: TokenModel = Security(
         get_token_bearer
-    ),
+    )
 ) -> ElementShortList:
     
   
