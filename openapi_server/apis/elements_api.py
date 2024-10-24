@@ -138,8 +138,8 @@ async def get_elements_by_startdate_and_enddate(
     page_number: int = Query(None, description="Page number, starting from 1", alias="page-number"),
     token_bearer: TokenModel = Security(
         get_token_bearer
-    )
-) -> ElementShortList:
+    )):
+# ) -> ElementShortList:
     asset_ids = []
     to_assets = []
     assert_infos=[]
@@ -153,7 +153,6 @@ async def get_elements_by_startdate_and_enddate(
     deviceId = None
     shortList=[]
     seen =set()
-    page_number = 1  # This can be dynamically changed as needed
     page_size = 100  # You can adjust this size based on your requirements
 
     shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
@@ -211,14 +210,6 @@ async def get_elements_by_startdate_and_enddate(
                 
                 relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
 
-                payload = {
-                    "parameters": {
-                        "fromId": deviceId, 
-                        "fromType": "DEVICE",
-                        "toType": "ASSET",  
-                        "direction": "FROM"  # Use "FROM" as per API requirements
-                    }
-                }
                 responseFromDevice = requests.get(relationsDevice_url, headers=headers)
                 if responseFromDevice.status_code == 200:
                     relations = responseFromDevice.json()
@@ -252,7 +243,7 @@ async def get_elements_by_startdate_and_enddate(
                                 )
                             else:
                                 for telemetry in assert_telemetries:
-                                    elementName = f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}"
+                                    elementName = f"{telemetry['dw_counter'][0]['value']}{telemetry['s_index'][0]['value']}"
                                     elementUid = telemetry['pfahl'][0]['value']
                                     identifier = (elementName, elementUid)
                                     if identifier not in seen:
@@ -274,19 +265,20 @@ async def get_elements_by_startdate_and_enddate(
                                         detail=f"Page number {page_number} exceeds total pages {totalPages}"
 
                                     )
-                                shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-                                page = int(page_number / page_size) + 1
-                                statistics = {
-                                    "totalPages": totalPages, 
-                                    "pageSize": shortList_len,
-                                    "currentPage": page_number
-                                }
-                                combined_data = {
-                                    "ShortList": shortList_return,
-                                    "statistics": statistics,
-                                    "prevLink": {"href": "string"},
-                                    "nextLink": {"href": "string"}
-                                }
+                                else:
+                                    shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+                                    page = int(page_number / page_size) + 1
+                                    statistics = {
+                                        "totalPages": totalPages, 
+                                        "pageSize": shortList_len,
+                                        "currentPage": page_number
+                                    }
+                                    combined_data = {
+                                        "ShortList": shortList_return,
+                                        "statistics": statistics,
+                                        "prevLink": {"href": "string"},
+                                        "nextLink": {"href": "string"}
+                                    }
                         else:
                             logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
                             raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
@@ -306,29 +298,53 @@ async def get_elements_by_startdate_and_enddate(
         page_size = 1
         page = page_number
         text_search = oemISOidentifier
+
+        
+        
+        customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
         customer_url = customer_base_url.format(customerId=customer_id)
 
         params = {
             "pageSize": page_size,
-            "page": page,
-            "textSearch": text_search
+            "page": page
         }
+       
 
         response = requests.get(url=customer_url, headers=headers, params=params)
 
         if response.status_code == 200:
-            data = response.json()
-            print("Received data:", data)
-            logging.debug("Received data: %s", data)
-            if data.get("customerId") is not None:
-               customerId = data.get("customerId").get("id")
-            device_name = data.get("name") 
-            if data.get("deviceProfileId") is not None:
-                entityProfile = data.get("deviceProfileId").get("id")  
-            if data.get("deviceId")is not None:
-                deviceId=data.get("deviceId").get("id")
+            dataFromCustomDevice = response.json()
+            print("Received data:", dataFromCustomDevice)
+            logging.debug("Received data: %s", dataFromCustomDevice)
+
+            allAssestFromCustomDevice={}
+            for item in dataFromCustomDevice["data"]:
+                name =item["name"]
+                device_id = item["id"]["id"]
+                allAssestFromCustomDevice[text_search] = device_id
+            deviceId=allAssestFromCustomDevice.get(text_search)
+
+            if deviceId:
+                relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+
+
+                response = requests.get(relationsDevice_url, headers=headers)
+                if response.status_code == 200:
+                    relations = response.json()
+                    print(relations)
+                else:
+                    print(f"Error: {responseFromDevice.status_code} - {responseFromDevice.text}")
+
+
+
+
+
+            else:
+                response.status_code == 404
+                raise HTTPException(status_code=404, detail="No element(s) found") 
+     
     
-            return "Hello"
+            return relations
         elif response.status_code == 404:
             raise HTTPException(status_code=404, detail="No element(s) found")
         else:
