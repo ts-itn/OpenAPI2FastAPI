@@ -77,19 +77,7 @@ async def login(form_data: CustomLoginForm = Depends()):
     
 
 
-asset_ids = []
-to_assets = []
-assert_infos=[]
-filtered_assets=[]
-asset_names=[]
-assert_telemetries = []
 
-customerId = None
-device_name = None
-entityProfile = None
-deviceId = None
-shortList=[]
-seen =set()
 def paginate_list(data_list, page_number, page_size=100):
     start_index = (page_number - 1) * page_size
     end_index = start_index + page_size
@@ -100,12 +88,7 @@ def paginate_list(data_list, page_number, page_size=100):
 
 
 
-page_number = 1  # This can be dynamically changed as needed
-page_size = 100  # You can adjust this size based on your requirements
 
-shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-print("Paginated List:", shortList_return)
-print("Total Number of Items in List:", shortList_len)
 
 
 
@@ -157,14 +140,49 @@ async def get_elements_by_startdate_and_enddate(
         get_token_bearer
     )
 ) -> ElementShortList:
-    
+    asset_ids = []
+    to_assets = []
+    assert_infos=[]
+    filtered_assets=[]
+    asset_names=[]
+    assert_telemetries = []
+
+    customerId = None
+    device_name = None
+    entityProfile = None
+    deviceId = None
+    shortList=[]
+    seen =set()
+    page_number = 1  # This can be dynamically changed as needed
+    page_size = 100  # You can adjust this size based on your requirements
+
+    shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+    print("Paginated List:", shortList_return)
+    print("Total Number of Items in List:", shortList_len)
+          
   
 
-    utc_time_start = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-    start_time_millis = int(utc_time_start.timestamp() * 1000)
 
-    utc_time_stop = datetime.strptime(end_date,  "%Y-%m-%dT%H:%M:%S.%fZ")
-    end_time_millis = int(utc_time_stop.timestamp() * 1000)
+    try:
+        utc_time_start = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+        start_time_millis = int(utc_time_start.timestamp() * 1000)
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Start time is not in the correct format. It should be '%Y-%m-%dT%H:%M:%S.%fZ'"
+        )
+
+    try:
+        utc_time_stop = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+        end_time_millis = int(utc_time_stop.timestamp() * 1000)
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="End time is not in the correct format. It should be '%Y-%m-%dT%H:%M:%S.%fZ'"
+        )
+
+
+
 
     token_info = token_bearer
     tenant_admin = token_info.get("tenant_admin")
@@ -181,6 +199,7 @@ async def get_elements_by_startdate_and_enddate(
             if response.status_code == 200:
                 data = response.json()
                 # print("Received data:", data)
+               
                 logging.debug("Received data: %s", data)
                 if data.get("customerId") is not None:
                     customerId = data.get("customerId").get("id")
@@ -203,6 +222,7 @@ async def get_elements_by_startdate_and_enddate(
                 responseFromDevice = requests.get(relationsDevice_url, headers=headers)
                 if responseFromDevice.status_code == 200:
                     relations = responseFromDevice.json()
+                    if not relations: raise HTTPException(status_code=404, detail="No element(s) found")
                     for rel in relations:
                         if rel['to']['entityType'] == 'ASSET':
                             asset_id = rel['to']['id']
@@ -224,42 +244,49 @@ async def get_elements_by_startdate_and_enddate(
                         if response_asset_telemetry.status_code == 200:
                             telemetry = response_asset_telemetry.json()
                             assert_telemetries.append(telemetry)
-                            for telemetry in assert_telemetries:
-                                elementName = f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}"
-                                elementUid = telemetry['pfahl'][0]['value']
-                                identifier = (elementName, elementUid)
-                                if identifier not in seen:
-                                    seen.add(identifier)
-                                    shortList.append({
-                                        "elementName": elementName,
-                                        "elementUid": elementUid
-                                    })
-                            shortList_len = len(shortList)
-                            totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
-                            page_size = 100
 
-                            if page_number > totalPages:
-                                (
-                                    "Requested page number %s exceeds total pages %s",
-                                    page_number, totalPages
-                                )
-                                raise HTTPException(  status_code =400, 
-                                    detail=f"Page number {page_number} exceeds total pages {totalPages}"
+                            if not telemetry:
+                                raise HTTPException(status_code =404, 
+                                    detail=f"No element(s) found"
 
                                 )
-                            shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-                            page = int(page_number / page_size) + 1
-                            statistics = {
-                                "totalPages": totalPages, 
-                                "pageSize": shortList_len,
-                                "currentPage": page_number
-                            }
-                            combined_data = {
-                                "ShortList": shortList_return,
-                                "statistics": statistics,
-                                "prevLink": {"href": "string"},
-                                "nextLink": {"href": "string"}
-                            }
+                            else:
+                                for telemetry in assert_telemetries:
+                                    elementName = f"{telemetry['s_index'][0]['value']}{telemetry['dw_counter'][0]['value']}"
+                                    elementUid = telemetry['pfahl'][0]['value']
+                                    identifier = (elementName, elementUid)
+                                    if identifier not in seen:
+                                        seen.add(identifier)
+                                        shortList.append({
+                                            "elementName": elementName,
+                                            "elementUid": elementUid
+                                        })
+                                shortList_len = len(shortList)
+                                totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
+                                page_size = 100
+
+                                if page_number > totalPages:
+                                    (
+                                        "Requested page number %s exceeds total pages %s",
+                                        page_number, totalPages
+                                    )
+                                    raise HTTPException(  status_code =400, 
+                                        detail=f"Page number {page_number} exceeds total pages {totalPages}"
+
+                                    )
+                                shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+                                page = int(page_number / page_size) + 1
+                                statistics = {
+                                    "totalPages": totalPages, 
+                                    "pageSize": shortList_len,
+                                    "currentPage": page_number
+                                }
+                                combined_data = {
+                                    "ShortList": shortList_return,
+                                    "statistics": statistics,
+                                    "prevLink": {"href": "string"},
+                                    "nextLink": {"href": "string"}
+                                }
                         else:
                             logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
                             raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
@@ -271,16 +298,10 @@ async def get_elements_by_startdate_and_enddate(
                 logging.error("Error in tenant URL response: %s - %s", response.status_code, response.text)
                 raise HTTPException(status_code=response.status_code, detail=response.text)
         except Exception as e:
-            # Log the exception with traceback for debugging
             logging.exception("An unexpected error occurred: %s", e)
-            # Return a generic error message
-            detail_message = str(e) if str(e).strip() else "Not implemented"
-            raise HTTPException(status_code=501, detail=detail_message)
+            detail_message = str(e) if str(e).strip() else "No element(s) found"
+            raise HTTPException(status_code=404, detail=detail_message)
 
-
-
-
-   
     else:
         page_size = 1
         page = page_number
