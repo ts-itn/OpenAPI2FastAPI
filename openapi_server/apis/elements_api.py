@@ -56,7 +56,7 @@ login_url = os.getenv('login_url', 'https://dacs.site/api/auth/login')
 
 @router.post("/login")
 async def login(form_data: CustomLoginForm = Depends()):
-    global toker_global  # Declaring global to modify the global variable
+    global toker_global  
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(login_url, json={
@@ -93,10 +93,10 @@ asset_telemetry_url = (
     "https://dacs.site/api/plugins/telemetry/ASSET/{assetId}/values/timeseries"
     "?keys={telemetry_keys}&startTs={start_date}&endTs={end_date}"
     # "&interval={interval}&limit={limit}&agg={agg}&orderBy={orderBy}"
-    ### Limit can be used for page 
+
 )
 telemetry_keys = ["pfahl", "s_index", "dw_counter"]
-keys_str = ",".join(telemetry_keys)  # Converts to "pfahl"
+keys_str = ",".join(telemetry_keys)
 def get_info_token(token_info: dict= Depends(get_token_bearer)):
     return token_info
 @router.get(
@@ -148,191 +148,198 @@ async def get_elements_by_startdate_and_enddate(
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     if tenant_admin:
         try:
-            device_name = oemISOidentifier
-            tenant_url = tenant_base_url + f"?deviceName={device_name}"
-            response = requests.get(tenant_url, headers=headers)
-            deviceId = None 
-            if response.status_code == 200:
-                data = response.json()       
-                logging.debug("Received data: %s", data)
-                if data.get("customerId") is not None:
-                    customerId = data.get("customerId").get("id")
-                device_name = data.get("name") 
-                if data.get("deviceProfileId") is not None:
-                    entityProfile = data.get("deviceProfileId").get("id")  
-                if data.get("id") is not None:
-                    deviceId = data.get("id").get("id")
-                relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
-                responseFromDevice = requests.get(relationsDevice_url, headers=headers)
-                if responseFromDevice.status_code == 200:
-                    relations = responseFromDevice.json()
-                    if not relations: raise HTTPException(status_code=404, detail="No element(s) found")
-                    for rel in relations:
-                        if rel['to']['entityType'] == 'ASSET':
-                            asset_id = rel['to']['id']
-                            asset_ids.add("asset_id")         
-                    for asset_id in asset_ids:
-                        keys_str = ",".join(telemetry_keys)
-                        url_assets_telemetry = asset_telemetry_url.format(
-                            assetId=asset_id, 
-                            telemetry_keys=keys_str,
-                            start_date=start_time_millis,
-                            end_date=end_time_millis,
-                        ) 
-                        response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
-                        if response_asset_telemetry.status_code == 200:
-                            telemetry = response_asset_telemetry.json()
-                            assert_telemetries.append(telemetry)
-                            if not telemetry:
-                                raise HTTPException(status_code =404, 
-                                    detail=f"No element(s) found"
-                                )
-                            else:
-                                for telemetry in assert_telemetries:
-                                    elementName = f"{telemetry['dw_counter'][0]['value']}{telemetry['s_index'][0]['value']}"
-                                    elementUid = telemetry['pfahl'][0]['value']
-                                    identifier = (elementName, elementUid)
-                                    if identifier not in seen:
-                                        seen.add(identifier)
-                                        shortList.append({
-                                            "elementName": elementName,
-                                            "elementUid": elementUid
-                                        })
-                                shortList_len = len(shortList)
-                                totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
-                                page_size = 100
-                                if page_number > totalPages:
-                                    (
-                                        "Requested page number %s exceeds total pages %s",
-                                        page_number, totalPages
-                                    )
-                                    raise HTTPException(  status_code =400, 
-                                        detail=f"Page number {page_number} exceeds total pages {totalPages}"
+            async with httpx.AsyncClient() as client:
+                device_name = oemISOidentifier
+                tenant_url = tenant_base_url + f"?deviceName={device_name}"
+                # response = requests.get(tenant_url, headers=headers)
+                response = await client.get(tenant_url, headers=headers)
+                deviceId = None 
+
+                if response.status_code == 200:
+                    data = response.json()       
+                    logging.debug("Received data: %s", data)
+                    if data.get("customerId") is not None:
+                        customerId = data.get("customerId").get("id")
+                    device_name = data.get("name") 
+                    if data.get("deviceProfileId") is not None:
+                        entityProfile = data.get("deviceProfileId").get("id")  
+                    if data.get("id") is not None:
+                        deviceId = data.get("id").get("id")
+
+                    relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+                    responseFromDevice = await client.get(relationsDevice_url, headers=headers)
+                    if responseFromDevice.status_code == 200:
+                        relations = responseFromDevice.json()
+                        if not relations: raise HTTPException(status_code=404, detail="No element(s) found")
+                        for rel in relations:
+                            if rel['to']['entityType'] == 'ASSET':
+                                asset_id = rel['to']['id']
+                                asset_ids.add("asset_id")         
+                        for asset_id in asset_ids:
+                            keys_str = ",".join(telemetry_keys)
+                            url_assets_telemetry = asset_telemetry_url.format(
+                                assetId=asset_id, 
+                                telemetry_keys=keys_str,
+                                start_date=start_time_millis,
+                                end_date=end_time_millis,
+                            ) 
+                            response_asset_telemetry = await client.get(url=url_assets_telemetry, headers=headers)
+                            if response_asset_telemetry.status_code == 200:
+                                telemetry = response_asset_telemetry.json()
+                                assert_telemetries.append(telemetry)
+                                if not telemetry:
+                                    raise HTTPException(status_code =404, 
+                                        detail=f"No element(s) found"
                                     )
                                 else:
-                                    shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-                                    page = int(page_number / page_size) + 1
-                                    statistics = {
-                                        "totalPages": totalPages, 
-                                        "pageSize": shortList_len,
-                                        "currentPage": page_number
-                                    }
-                                    combined_data = {
-                                        "ShortList": shortList_return,
-                                        "statistics": statistics,
-                                        "prevLink": {"href": "string"},
-                                        "nextLink": {"href": "string"}
-                                    }
-                        else:
-                            logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
-                            raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
-                    return combined_data
+                                    for telemetry in assert_telemetries:
+                                        elementName = f"{telemetry['dw_counter'][0]['value']}{telemetry['s_index'][0]['value']}"
+                                        elementUid = telemetry['pfahl'][0]['value']
+                                        identifier = (elementName, elementUid)
+                                        if identifier not in seen:
+                                            seen.add(identifier)
+                                            shortList.append({
+                                                "elementName": elementName,
+                                                "elementUid": elementUid
+                                            })
+                                    shortList_len = len(shortList)
+                                    totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
+                                    page_size = 100
+                                    if page_number > totalPages:
+                                        (
+                                            "Requested page number %s exceeds total pages %s",
+                                            page_number, totalPages
+                                        )
+                                        raise HTTPException(  status_code =400, 
+                                            detail=f"Page number {page_number} exceeds total pages {totalPages}"
+                                        )
+                                    else:
+                                        shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+                                        page = int(page_number / page_size) + 1
+                                        statistics = {
+                                            "totalPages": totalPages, 
+                                            "pageSize": shortList_len,
+                                            "currentPage": page_number
+                                        }
+                                        combined_data = {
+                                            "ShortList": shortList_return,
+                                            "statistics": statistics,
+                                            "prevLink": {"href": "string"},
+                                            "nextLink": {"href": "string"}
+                                        }
+                            else:
+                                logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
+                                raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
+                        return combined_data
+                    else:
+                        logging.error("Error in device relations response: %s - %s", responseFromDevice.status_code, responseFromDevice.text)
+                        raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
                 else:
-                    logging.error("Error in device relations response: %s - %s", responseFromDevice.status_code, responseFromDevice.text)
-                    raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
-            else:
-                logging.error("Error in tenant URL response: %s - %s", response.status_code, response.text)
-                raise HTTPException(status_code=response.status_code, detail=response.text)
+                    logging.error("Error in tenant URL response: %s - %s", response.status_code, response.text)
+                    raise HTTPException(status_code=response.status_code, detail=response.text)
         except Exception as e:
             logging.exception("An unexpected error occurred: %s", e)
             detail_message = str(e) if str(e).strip() else "No element(s) found"
             raise HTTPException(status_code=404, detail=detail_message)
     else:
         try:
-            page_size = 1
-            page = 0
-            text_search = oemISOidentifier
-            customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
-            customer_url = customer_base_url.format(customerId=customer_id)
-            params = {
-                "pageSize": page_size,
-                "page": page
-            }
-            response = requests.get(url=customer_url, headers=headers, params=params)
-            if response.status_code == 200:
-                dataFromCustomDevice = response.json()
-                print("Received data:", dataFromCustomDevice)
-                logging.debug("Received data: %s", dataFromCustomDevice)
-                allAssestFromCustomDevice={}
-                for item in dataFromCustomDevice["data"]:
-                    name =item["name"]
-                    device_id = item["id"]["id"]
-                    allAssestFromCustomDevice[text_search] = device_id
-                deviceId=allAssestFromCustomDevice.get(text_search)
-                print(f"deviceId {deviceId}")
-                deviceId="7285c700-6c2e-11ef-90e8-55d4ef5ca6bb"
-                if deviceId:               
-                    relationsDevice_url = f"https://dacs.site/api/relations?fromId={deviceId}&fromType=DEVICE"
-                responseFromDevice = requests.get(relationsDevice_url, headers=headers)
-                if responseFromDevice.status_code == 200:
-                    relations = responseFromDevice.json()
-                    if not relations: raise HTTPException(status_code=404, detail="No element(s) found")
-                    asset_ids = set()
-                    for rel in relations:
-                        if rel['to']['entityType'] == 'ASSET':
-                            asset_id = rel['to']['id']
-                            asset_ids.add(asset_id) 
-                    for asset_id in asset_ids:
-                        keys_str = ",".join(telemetry_keys)
-                        url_assets_telemetry = asset_telemetry_url.format(
-                            assetId=asset_id, 
-                            telemetry_keys=keys_str,
-                            start_date=start_time_millis,
-                            end_date=end_time_millis,
-                            )
-                        response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
-                        if response_asset_telemetry.status_code == 200:
-                            telemetry = response_asset_telemetry.json()
-                            assert_telemetries.append(telemetry)
-                            if not telemetry:
-                                raise HTTPException(status_code =404, 
-                                    detail=f"No element(s) found"
-                            )
-                            else:
-                                for telemetry in assert_telemetries:
-                                    elementName = f"{telemetry['dw_counter'][0]['value']}{telemetry['s_index'][0]['value']}"
-                                    elementUid = telemetry['pfahl'][0]['value']
-                                    identifier = (elementName, elementUid)
-                                    if identifier not in seen:
-                                        seen.add(identifier)
-                                        shortList.append({
-                                            "elementName": elementName,
-                                            "elementUid": elementUid
-                                        })
-                                shortList_len = len(shortList)
-                                totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
-                                page_size = 100
-                                if page_number > totalPages:
-                                        (
-                                            "Requested page number %s exceeds total pages %s",
-                                            page_number, totalPages
-                                        )
-                                        raise HTTPException(  status_code =400, 
-                                            detail=f"Page number {page_number} exceeds total pages {totalPages}" )
+            async with httpx.AsyncClient() as client:
+                page_size = 100
+                page = 0
+                text_search = oemISOidentifier
+                customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
+                customer_url = customer_base_url.format(customerId=customer_id)
+                params = {
+                    "pageSize": page_size,
+                    "page": page,
+                    "textSearch":text_search,
+                }
+               
+                response= await client.get(url=customer_url, headers=headers, params=params)
+                if response.status_code == 200:
+                    dataFromCustomDevice = response.json()
+                    # print("Received data:", dataFromCustomDevice)
+                    logging.debug("Received data: %s", dataFromCustomDevice)
+                    allAssestFromCustomDevice={}
+                    for item in dataFromCustomDevice["data"]:
+                        name =item["name"]
+                        device_id = item["id"]["id"]
+                        allAssestFromCustomDevice[text_search] = device_id
+                    deviceId=allAssestFromCustomDevice.get(text_search)
+                    print(f"deviceId {deviceId}")
+                    if deviceId:               
+                        relationsDevice_url = f"https://dacs.site/api/relations?fromId={deviceId}&fromType=DEVICE"
+                    responseFromDevice = await client.get(relationsDevice_url, headers=headers)
+                    if responseFromDevice.status_code == 200:
+                        relations = responseFromDevice.json()
+                        if not relations: raise HTTPException(status_code=404, detail="No element(s) found")
+                        asset_ids = set()
+                        for rel in relations:
+                            if rel['to']['entityType'] == 'ASSET':
+                                asset_id = rel['to']['id']
+                                asset_ids.add(asset_id) 
+                        for asset_id in asset_ids:
+                            keys_str = ",".join(telemetry_keys)
+                            url_assets_telemetry = asset_telemetry_url.format(
+                                assetId=asset_id, 
+                                telemetry_keys=keys_str,
+                                start_date=start_time_millis,
+                                end_date=end_time_millis,
+                                )
+                            # response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
+                            response_asset_telemetry = await client.get(url=url_assets_telemetry, headers=headers)
+                            if response_asset_telemetry.status_code == 200:
+                                telemetry = response_asset_telemetry.json()
+                                assert_telemetries.append(telemetry)
+                                if not telemetry:
+                                    raise HTTPException(status_code =404, 
+                                        detail=f"No element(s) found"
+                                )
                                 else:
-                                    shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-                                    page = int(page_number / page_size) + 1
-                                    statistics = {
-                                        "totalPages": totalPages, 
-                                        "pageSize": shortList_len,
-                                        "currentPage": page_number
-                                    }
-                                    combined_data = {
-                                        "ShortList": shortList_return,
-                                        "statistics": statistics,
-                                        "prevLink": {"href": "string"},
-                                        "nextLink": {"href": "string"}
-                                    }
-                        else:
-                            logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
-                            raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
-                    return combined_data
+                                    for telemetry in assert_telemetries:
+                                        elementName = f"{telemetry['dw_counter'][0]['value']}{telemetry['s_index'][0]['value']}"
+                                        elementUid = telemetry['pfahl'][0]['value']
+                                        identifier = (elementName, elementUid)
+                                        if identifier not in seen:
+                                            seen.add(identifier)
+                                            shortList.append({
+                                                "elementName": elementName,
+                                                "elementUid": elementUid
+                                            })
+                                    shortList_len = len(shortList)
+                                    totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
+                                    page_size = 100
+                                    if page_number > totalPages:
+                                            (
+                                                "Requested page number %s exceeds total pages %s",
+                                                page_number, totalPages
+                                            )
+                                            raise HTTPException(  status_code =400, 
+                                                detail=f"Page number {page_number} exceeds total pages {totalPages}" )
+                                    else:
+                                        shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+                                        page = int(page_number / page_size) + 1
+                                        statistics = {
+                                            "totalPages": totalPages, 
+                                            "pageSize": shortList_len,
+                                            "currentPage": page_number
+                                        }
+                                        combined_data = {
+                                            "ShortList": shortList_return,
+                                            "statistics": statistics,
+                                            "prevLink": {"href": "string"},
+                                            "nextLink": {"href": "string"}
+                                        }
+                            else:
+                                logging.error("Error in asset telemetry response: %s - %s", response_asset_telemetry.status_code, response_asset_telemetry.text)
+                                raise HTTPException(status_code=response_asset_telemetry.status_code, detail=response_asset_telemetry.text)
+                        return combined_data
+                    else:
+                        logging.error("Error in device relations response: %s - %s", responseFromDevice.status_code, responseFromDevice.text)
+                        raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
                 else:
-                    logging.error("Error in device relations response: %s - %s", responseFromDevice.status_code, responseFromDevice.text)
-                    raise HTTPException(status_code=responseFromDevice.status_code, detail=responseFromDevice.text)
-            else:
-                logging.error("Error in tenant URL response: %s - %s", response.status_code, response.text)
-                raise HTTPException(status_code=response.status_code, detail=response.text)
+                    logging.error("Error in tenant URL response: %s - %s", response.status_code, response.text)
+                    raise HTTPException(status_code=response.status_code, detail=response.text)
         except Exception as e:
             logging.exception("An unexpected error occurred: %s", e)
             detail_message = str(e) if str(e).strip() else "No element(s) found"
