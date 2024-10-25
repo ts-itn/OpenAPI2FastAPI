@@ -151,7 +151,6 @@ async def get_elements_by_startdate_and_enddate(
             async with httpx.AsyncClient() as client:
                 device_name = oemISOidentifier
                 tenant_url = tenant_base_url + f"?deviceName={device_name}"
-                # response = requests.get(tenant_url, headers=headers)
                 response = await client.get(tenant_url, headers=headers)
                 deviceId = None 
 
@@ -286,7 +285,7 @@ async def get_elements_by_startdate_and_enddate(
                                 start_date=start_time_millis,
                                 end_date=end_time_millis,
                                 )
-                            # response_asset_telemetry = requests.get(url=url_assets_telemetry, headers=headers)
+                            
                             response_asset_telemetry = await client.get(url=url_assets_telemetry, headers=headers)
                             if response_asset_telemetry.status_code == 200:
                                 telemetry = response_asset_telemetry.json()
