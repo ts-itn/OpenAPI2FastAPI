@@ -325,7 +325,10 @@ async def get_elements_by_startdate_and_enddate(
             deviceId=allAssestFromCustomDevice.get(text_search)
 
             if deviceId:
-                relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+                # relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+             
+                relationsDevice_url = f"https://dacs.site/api/relations?fromId={deviceId}&fromType=DEVICE"
+
 
 
                 response = requests.get(relationsDevice_url, headers=headers)
