@@ -87,24 +87,9 @@ def paginate_list(data_list, page_number, page_size=100):
         return "No items to display. Page number may be out of range.", []
     return paginated_list, len(data_list)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 @router.get("/get_token_info")
 async def get_info(token_info: dict= Depends(get_token_bearer)):
     return token_info
-
-
 customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
 tenant_base_url = "https://dacs.site/api/tenant/devices" 
 relationsDevice2Asset = "https://dacs.site/api/relations?fromId={YOUR_DEVICE_ID}&fromType=DEVICE"
@@ -117,8 +102,6 @@ asset_telemetry_url = (
 )
 telemetry_keys = ["pfahl", "s_index", "dw_counter"]
 keys_str = ",".join(telemetry_keys)  # Converts to "pfahl"
- 
-
 def get_info_token(token_info: dict= Depends(get_token_bearer)):
     return token_info
 @router.get(
@@ -141,25 +124,13 @@ async def get_elements_by_startdate_and_enddate(
         get_token_bearer
     )) -> ElementShortList:
     asset_ids = set()
-    
-    assert_infos=[]
-    filtered_assets=[]
-    asset_names=[]
     assert_telemetries = []
-
-    customerId = None
     device_name = None
-    entityProfile = None
     deviceId = None
     shortList=[]
     seen =set()
     page_size = 100 
-
     shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
-          
-  
-
-
     try:
         utc_time_start = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%fZ")
         start_time_millis = int(utc_time_start.timestamp() * 1000)
@@ -168,7 +139,6 @@ async def get_elements_by_startdate_and_enddate(
             status_code=400,
             detail="Start time is not in the correct format. It should be '%Y-%m-%dT%H:%M:%S.%fZ'"
         )
-
     try:
         utc_time_stop = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%S.%fZ")
         end_time_millis = int(utc_time_stop.timestamp() * 1000)
@@ -183,15 +153,12 @@ async def get_elements_by_startdate_and_enddate(
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     if tenant_admin:
         try:
-            
             device_name = oemISOidentifier
             tenant_url = tenant_base_url + f"?deviceName={device_name}"
             response = requests.get(tenant_url, headers=headers)
             deviceId = None 
             if response.status_code == 200:
-                data = response.json()
-                # print("Received data:", data)
-               
+                data = response.json()       
                 logging.debug("Received data: %s", data)
                 if data.get("customerId") is not None:
                     customerId = data.get("customerId").get("id")
@@ -200,9 +167,7 @@ async def get_elements_by_startdate_and_enddate(
                     entityProfile = data.get("deviceProfileId").get("id")  
                 if data.get("id") is not None:
                     deviceId = data.get("id").get("id")
-                
                 relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
-
                 responseFromDevice = requests.get(relationsDevice_url, headers=headers)
                 if responseFromDevice.status_code == 200:
                     relations = responseFromDevice.json()
@@ -210,8 +175,7 @@ async def get_elements_by_startdate_and_enddate(
                     for rel in relations:
                         if rel['to']['entityType'] == 'ASSET':
                             asset_id = rel['to']['id']
-                            asset_ids.add("asset_id")
-                                    
+                            asset_ids.add("asset_id")         
                     for asset_id in asset_ids:
                         keys_str = ",".join(telemetry_keys)
                         url_assets_telemetry = asset_telemetry_url.format(
@@ -224,11 +188,9 @@ async def get_elements_by_startdate_and_enddate(
                         if response_asset_telemetry.status_code == 200:
                             telemetry = response_asset_telemetry.json()
                             assert_telemetries.append(telemetry)
-
                             if not telemetry:
                                 raise HTTPException(status_code =404, 
                                     detail=f"No element(s) found"
-
                                 )
                             else:
                                 for telemetry in assert_telemetries:
@@ -244,7 +206,6 @@ async def get_elements_by_startdate_and_enddate(
                                 shortList_len = len(shortList)
                                 totalPages = math.ceil(shortList_len / 100) if shortList_len > 0 else 1
                                 page_size = 100
-
                                 if page_number > totalPages:
                                     (
                                         "Requested page number %s exceeds total pages %s",
@@ -252,7 +213,6 @@ async def get_elements_by_startdate_and_enddate(
                                     )
                                     raise HTTPException(  status_code =400, 
                                         detail=f"Page number {page_number} exceeds total pages {totalPages}"
-
                                     )
                                 else:
                                     shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
@@ -288,18 +248,13 @@ async def get_elements_by_startdate_and_enddate(
             page_size = 1
             page = 0
             text_search = oemISOidentifier
-
-            
-            
             customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
             customer_url = customer_base_url.format(customerId=customer_id)
-
             params = {
                 "pageSize": page_size,
                 "page": page
             }
             response = requests.get(url=customer_url, headers=headers, params=params)
-
             if response.status_code == 200:
                 dataFromCustomDevice = response.json()
                 print("Received data:", dataFromCustomDevice)
@@ -315,14 +270,11 @@ async def get_elements_by_startdate_and_enddate(
                 deviceId="7285c700-6c2e-11ef-90e8-55d4ef5ca6bb"
                 if deviceId:               
                     relationsDevice_url = f"https://dacs.site/api/relations?fromId={deviceId}&fromType=DEVICE"
-
                 responseFromDevice = requests.get(relationsDevice_url, headers=headers)
                 if responseFromDevice.status_code == 200:
                     relations = responseFromDevice.json()
                     if not relations: raise HTTPException(status_code=404, detail="No element(s) found")
-
                     asset_ids = set()
-                    # to_assets = set()
                     for rel in relations:
                         if rel['to']['entityType'] == 'ASSET':
                             asset_id = rel['to']['id']
@@ -339,11 +291,9 @@ async def get_elements_by_startdate_and_enddate(
                         if response_asset_telemetry.status_code == 200:
                             telemetry = response_asset_telemetry.json()
                             assert_telemetries.append(telemetry)
-
                             if not telemetry:
                                 raise HTTPException(status_code =404, 
                                     detail=f"No element(s) found"
-
                             )
                             else:
                                 for telemetry in assert_telemetries:
