@@ -346,8 +346,6 @@ async def get_elements_by_startdate_and_enddate(
             logging.exception("An unexpected error occurred: %s", e)
             detail_message = str(e) if str(e).strip() else "No element(s) found"
             raise HTTPException(status_code=404, detail=detail_message)
-
-
 # ###-------------------------------------------------------------------------------
 # @router.get(
 #     "/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/data_series/",
