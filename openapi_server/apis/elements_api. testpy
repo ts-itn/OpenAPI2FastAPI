@@ -139,7 +139,8 @@ async def get_elements_by_startdate_and_enddate(
     page_number: int = Query(None, description="Page number, starting from 1", alias="page-number"),
     token_bearer: TokenModel = Security(
         get_token_bearer
-    )) -> ElementShortList:
+    )):
+# ) -> ElementShortList:
     asset_ids = set()
     
     assert_infos=[]
@@ -156,6 +157,8 @@ async def get_elements_by_startdate_and_enddate(
     page_size = 100 
 
     shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
+    print("Paginated List:", shortList_return)
+    print("Total Number of Items in List:", shortList_len)
           
   
 
@@ -177,10 +180,16 @@ async def get_elements_by_startdate_and_enddate(
             status_code=400,
             detail="End time is not in the correct format. It should be '%Y-%m-%dT%H:%M:%S.%fZ'"
         )
+
+
+
+
     token_info = token_bearer
     tenant_admin = token_info.get("tenant_admin")
     customer_id = token_info.get("customer_id")
     headers = {"Authorization": f"Bearer {token_info['token']}"}
+
+
     if tenant_admin:
         try:
             
@@ -211,6 +220,11 @@ async def get_elements_by_startdate_and_enddate(
                         if rel['to']['entityType'] == 'ASSET':
                             asset_id = rel['to']['id']
                             asset_ids.add("asset_id")
+                            # to_assest = rel['to']
+                            # if asset_id not in asset_ids:
+                            #     asset_ids.append(asset_id)
+                            # if to_assest not in to_assets:
+                            #     to_assets.append(to_assest)
                                     
                     for asset_id in asset_ids:
                         keys_str = ",".join(telemetry_keys)
@@ -298,6 +312,8 @@ async def get_elements_by_startdate_and_enddate(
                 "pageSize": page_size,
                 "page": page
             }
+        
+
             response = requests.get(url=customer_url, headers=headers, params=params)
 
             if response.status_code == 200:
@@ -313,8 +329,12 @@ async def get_elements_by_startdate_and_enddate(
                 deviceId=allAssestFromCustomDevice.get(text_search)
                 print(f"deviceId {deviceId}")
                 deviceId="7285c700-6c2e-11ef-90e8-55d4ef5ca6bb"
-                if deviceId:               
+                if deviceId:
+                    # relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
+                
                     relationsDevice_url = f"https://dacs.site/api/relations?fromId={deviceId}&fromType=DEVICE"
+
+
 
                 responseFromDevice = requests.get(relationsDevice_url, headers=headers)
                 if responseFromDevice.status_code == 200:
@@ -326,7 +346,14 @@ async def get_elements_by_startdate_and_enddate(
                     for rel in relations:
                         if rel['to']['entityType'] == 'ASSET':
                             asset_id = rel['to']['id']
+                            # to_assest = rel['to']
+                            # if asset_id not in asset_ids:
+                                # asset_ids.append(asset_id)
                             asset_ids.add(asset_id) 
+                            # # if to_assest not in to_assets:
+                            #     # to_assets.append(to_assest)
+                            # to_assets.add(to_assest) 
+                    
                     for asset_id in asset_ids:
                         keys_str = ",".join(telemetry_keys)
                         url_assets_telemetry = asset_telemetry_url.format(
