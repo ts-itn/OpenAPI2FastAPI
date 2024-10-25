@@ -67,7 +67,6 @@ async def login(form_data: CustomLoginForm = Depends()):
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=exc.response.status_code if exc.response else 500,
                                 detail=str(exc)) from exc
-
         data = response.json()
         token = data.get("token")
         if not token:
@@ -81,7 +80,6 @@ def paginate_list(data_list, page_number, page_size=100):
     if not paginated_list and page_number != 1:
         return "No items to display. Page number may be out of range.", []
     return paginated_list, len(data_list)
-
 @router.get("/get_token_info")
 async def get_info(token_info: dict= Depends(get_token_bearer)):
     return token_info
@@ -153,7 +151,6 @@ async def get_elements_by_startdate_and_enddate(
                 tenant_url = tenant_base_url + f"?deviceName={device_name}"
                 response = await client.get(tenant_url, headers=headers)
                 deviceId = None 
-
                 if response.status_code == 200:
                     data = response.json()       
                     logging.debug("Received data: %s", data)
@@ -164,7 +161,6 @@ async def get_elements_by_startdate_and_enddate(
                         entityProfile = data.get("deviceProfileId").get("id")  
                     if data.get("id") is not None:
                         deviceId = data.get("id").get("id")
-
                     relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
                     responseFromDevice = await client.get(relationsDevice_url, headers=headers)
                     if responseFromDevice.status_code == 200:
