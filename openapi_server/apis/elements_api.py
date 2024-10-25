@@ -72,13 +72,8 @@ async def login(form_data: CustomLoginForm = Depends()):
         token = data.get("token")
         if not token:
             raise HTTPException(status_code=500, detail="Token not found in response")
-
-        toker_global = token  # Save token in global variable (consider better alternatives for production)
+        toker_global = token 
         return {"token": toker_global}
-    
-
-
-
 def paginate_list(data_list, page_number, page_size=100):
     start_index = (page_number - 1) * page_size
     end_index = start_index + page_size
@@ -242,7 +237,6 @@ async def get_elements_by_startdate_and_enddate(
             logging.exception("An unexpected error occurred: %s", e)
             detail_message = str(e) if str(e).strip() else "No element(s) found"
             raise HTTPException(status_code=404, detail=detail_message)
-
     else:
         try:
             page_size = 1
@@ -259,7 +253,6 @@ async def get_elements_by_startdate_and_enddate(
                 dataFromCustomDevice = response.json()
                 print("Received data:", dataFromCustomDevice)
                 logging.debug("Received data: %s", dataFromCustomDevice)
-
                 allAssestFromCustomDevice={}
                 for item in dataFromCustomDevice["data"]:
                     name =item["name"]
@@ -315,9 +308,7 @@ async def get_elements_by_startdate_and_enddate(
                                             page_number, totalPages
                                         )
                                         raise HTTPException(  status_code =400, 
-                                            detail=f"Page number {page_number} exceeds total pages {totalPages}"
-
-                                        )
+                                            detail=f"Page number {page_number} exceeds total pages {totalPages}" )
                                 else:
                                     shortList_return, shortList_len = paginate_list(shortList, page_number, page_size)
                                     page = int(page_number / page_size) + 1
