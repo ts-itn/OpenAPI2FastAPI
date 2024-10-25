@@ -154,11 +154,11 @@ async def get_elements_by_startdate_and_enddate(
                 if response.status_code == 200:
                     data = response.json()       
                     logging.debug("Received data: %s", data)
-                    if data.get("customerId") is not None:
-                        customerId = data.get("customerId").get("id")
+                    # if data.get("customerId") is not None:
+                    #     customerId = data.get("customerId").get("id")
                     device_name = data.get("name") 
-                    if data.get("deviceProfileId") is not None:
-                        entityProfile = data.get("deviceProfileId").get("id")  
+                    # if data.get("deviceProfileId") is not None:
+                    #     entityProfile = data.get("deviceProfileId").get("id")  
                     if data.get("id") is not None:
                         deviceId = data.get("id").get("id")
                     relationsDevice_url = f"https://dacs.site/api/relations/info?fromId={deviceId}&fromType=DEVICE"
@@ -169,7 +169,7 @@ async def get_elements_by_startdate_and_enddate(
                         for rel in relations:
                             if rel['to']['entityType'] == 'ASSET':
                                 asset_id = rel['to']['id']
-                                asset_ids.add("asset_id")         
+                                asset_ids.add(asset_id)         
                         for asset_id in asset_ids:
                             keys_str = ",".join(telemetry_keys)
                             url_assets_telemetry = asset_telemetry_url.format(
