@@ -278,10 +278,6 @@ async def get_elements_by_startdate_and_enddate(
 def convert_timestamp(ts_millis):
     timestamp_seconds = int(ts_millis) / 1000
     return datetime.fromtimestamp(timestamp_seconds, timezone.utc).isoformat()
-
-
-
-
 def  getDataSeries(telemetries):
     data_by_ts = {}
     for key, values in telemetries.items():
@@ -298,9 +294,6 @@ def  getDataSeries(telemetries):
             data_by_ts[ts_millis]['timestamp'] = convert_timestamp(ts_millis)
     result = list(data_by_ts.values())
     return result
-
-
-
 
 async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], device_id: str, element_uid: str) -> Set[str]:
     relations_url = f"https://dacs.site/api/relations/info?fromId={device_id}&fromType=DEVICE"
