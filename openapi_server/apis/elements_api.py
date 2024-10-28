@@ -1,4 +1,39 @@
 # coding: utf-8
+from collections import OrderedDict
+from openapi_server.models.extra_models import TokenModel  # noqa: F401
+from openapi_server.models.element import Element
+from openapi_server.models.element_short_list import ElementShortList
+from openapi_server.models.get_element_header import GetElementHeader
+from openapi_server.models.get_event_data import GetEventData
+from openapi_server.models.get_measurement_pass_series import GetMeasurementPassSeries
+from openapi_server.models.getdata_series import GetdataSeries
+from openapi_server.security_api import get_token_bearer
+from pydantic import BaseModel
+from dotenv import load_dotenv
+import os
+from fastapi.security import HTTPBearer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import time
 import logging
 import asyncio
 import math
@@ -99,11 +134,11 @@ async def fetch_asset_ids(client: httpx.AsyncClient, headers: Dict[str, str], de
 
 async def fetch_telemetry(client: httpx.AsyncClient, headers: Dict[str, str], asset_id: str, start_time_millis: int, end_time_millis: int, telemetry_keys: List[str]) -> Dict[str, Any]:
     keys_str = ",".join(telemetry_keys)
-    url = (
+    url_telemerty = (
         f"https://dacs.site/api/plugins/telemetry/ASSET/{asset_id}/values/timeseries"
         f"?keys={keys_str}&startTs={start_time_millis}&endTs={end_time_millis}"
     )
-    response = await client.get(url, headers=headers)
+    response = await client.get(url_telemerty, headers=headers)
     response.raise_for_status()
     telemetry = response.json()
     return telemetry
@@ -168,6 +203,8 @@ def paginate_list(data_list: List[Any], page_number: int, page_size: int = 100) 
     summary="Get all element_uid's between start and end date",
     response_model_by_alias=True,
 )
+
+
 async def get_elements_by_startdate_and_enddate(
     oemISOidentifier: str = Path(..., description="OEM ISO identifier, as defined in ISO 15143-3"),
     start_date: str = Query(None, description="Start time/date in UTC format", alias="start-date"),
@@ -196,10 +233,11 @@ async def get_elements_by_startdate_and_enddate(
     tenant_admin = token_info.get("tenant_admin", False)
     customer_id = token_info.get("customer_id")
     headers = {"Authorization": f"Bearer {token_info['token']}"}
+
     async with httpx.AsyncClient() as client:
         try:
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
-            asset_ids = await fetch_asset_ids(client, headers, device_id)
+            asset_ids = await fetch_asset_ids(client, headers, device_id )
             telemetries = await fetch_telemetries(client, headers, asset_ids, start_time_millis, end_time_millis, telemetry_keys)
             short_list = process_telemetries(telemetries)
             paginated_list, total_items = paginate_list(short_list, page_number, page_size=100)
@@ -227,5 +265,162 @@ async def get_elements_by_startdate_and_enddate(
         except HTTPException as he:
             raise he
         except Exception as e:
-            logging.exception("An unexpected error occurred")
-            raise HTTPException(status_code=500, detail="Internal server error")
+            # logging.exception("An unexpected error occurred")
+            # raise HTTPException(status_code=500, detail="Internal server error")
+            detail_message = str(e) if str(e).strip() else "No element(s) found"
+            raise HTTPException(status_code=404, detail=detail_message)
+
+
+
+
+################################## Part 2 ###########################################################################
+def convert_timestamp(ts):
+    return datetime.datetime.fromtimestamp(ts / 1000).isoformat() + "Z"
+
+
+
+async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], device_id: str, element_uid: str) -> Set[str]:
+    relations_url = f"https://dacs.site/api/relations/info?fromId={device_id}&fromType=DEVICE"
+    response = await client.get(relations_url, headers=headers)
+    response.raise_for_status()
+    relations = response.json()
+    if not relations:
+        raise HTTPException(status_code=404, detail="No asset relations found for device")
+
+
+    for rel in relations:
+        if rel.get('to', {}).get('entityType') == 'ASSET' and rel.get('toName').split('/')[1] == element_uid:
+            mode_1 = rel.get('toName').split('/')[2].split("_")[0]
+            mode_2 = rel.get('toName').split('/')[2].split("_")[1]
+            asset_id = rel.get('to', {}).get('id')
+
+    return asset_id , mode_1, mode_2, relations
+
+@router.get(
+    "/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/data_series/",
+    responses={
+        200: {"model": GetdataSeries, "description": "Successful operation"},
+        400: {"description": "Invalid parameter supplied"},
+        404: {"description": "No element(s) found"},
+    },
+    tags=["Elements"],
+    summary="Get selected data_series of element with uid",
+    response_model_by_alias=True,
+)
+async def get_element_data_series(
+    oemISOidentifier: str = Path(..., description="OEM ISO identifier, as defined in ISO 15143-3"),
+    element_uid: str = Path(..., description="Unique Id of the element"),
+    page_number: int = Query(1, description="Page number, starting from 1", alias="page-number"),
+    token_bearer: dict = Security(get_token_bearer)
+):
+    
+    token_info = token_bearer
+    tenant_admin = token_info.get("tenant_admin", False)
+    customer_id = token_info.get("customer_id")
+    headers = {"Authorization": f"Bearer {token_info['token']}"}
+    telemetrie_series=[]
+
+
+
+    async with httpx.AsyncClient() as client:
+        try:
+            device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
+            asset_id , mode_1, mode_2 , relations= await fetch_asset_name(client, headers, device_id, element_uid)
+            start_time_millis = 0 
+            end_time_millis = int(time.time() * 1000)
+            telemetrie_series=[]
+
+            ##### Kelly Drilling -Series ################
+            if mode_2=="Kelly":
+                telemetry_keys =["timestamp", "i_kelly_depth_driver" , "i_kelly_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y"]
+                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                telemetrie_series.append(telemetries)
+
+             ##### Kelly Drilling- Series ################   
+            elif mode_2=="CFA":
+                telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_crowd_load_winch" , "i_crowd_speed" , "i_leader_inclination_x", "i_leader_inclination_y",
+                                  "udi_concrete_quantity_total", "ui_concrete_pressure"]
+                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                telemetrie_series.append(telemetries)
+
+             ##### Full displacement - Series ################   
+            elif mode_2=="Full displacement":
+                telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
+                                  "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
+                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                telemetrie_series.append(telemetries)
+
+
+             ##### Double rotary Series  ################   
+            elif mode_2==" Double rotary":
+                telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
+                                  "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
+                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                telemetrie_series.append(telemetries)
+            
+                ##### Vibro pilling -Series ################   
+            elif mode_2=="Vibro pilling":
+                telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_crowd_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y",
+                                  "i_vibrator_revolution_act", "i_vibrator_static_moment_act", "i_vibrator_amplitude"]
+                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                telemetrie_series.append(telemetries)
+            ##########  Delete this part #########
+            else:
+                telemetry_keys =["timestamp", "depthOrientation" , "dw_counter" , "gnummer" , "pfahl", "s_operation_mode_1",
+                                  "s_operation_mode_3", "s_SFID_unique_rec_counter", "start_ts"]
+                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                
+           
+            for item in telemetries:
+                if isinstance(item, dict):
+                    try:
+                        simplified_series = {
+                            "timestamp": convert_timestamp(item["timestamp"][0]["ts"]),
+                            "depthOrientation": item["depthOrientation"][0]["value"],
+                            "dw_counter": int(item["dw_counter"][0]["value"]),
+                            "gnummer": item["gnummer"][0]["value"],
+                            "pfahl": int(item["pfahl"][0]["value"]),
+                            "s_operation_mode_1": item["s_operation_mode_1"][0]["value"],
+                            "s_operation_mode_3": item["s_operation_mode_3"][0]["value"],
+                            "s_SFID_unique_rec_counter": item["s_SFID_unique_rec_counter"][0]["value"],
+                            "start_ts": convert_timestamp(int(item["start_ts"][0]["value"]))
+                        }
+                        telemetrie_series.append(simplified_series)
+                    except KeyError as e:
+                        print(f"Missing key: {e}")
+                    except IndexError as e:
+                        print(f"Data format error: {e}")
+                    except TypeError as e:
+                        print(f"Type error: {e}, check data types")
+                else:
+                    print("Data format error: Expected item to be a dictionary")
+            
+
+            paginated_list, total_items = paginate_list(telemetrie_series, page_number, page_size=100)
+            total_pages = max(1, math.ceil(total_items / 100))
+            if not paginated_list:
+                raise HTTPException(status_code=404, detail="No element(s) found on this page")
+            statistics = {
+                "totalPages": total_pages,
+                "pageSize": len(paginated_list),
+                "currentPage": page_number
+            }
+            prev_link = None
+            if page_number > 1:
+                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
+            next_link = None
+            if page_number < total_pages:
+                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
+            combined_data = {
+                "dataSeries": paginated_list,
+                "statistics": statistics,
+                "prevLink": prev_link,
+                "nextLink": next_link
+            }
+            return telemetrie_series
+        except HTTPException as he:
+            raise he
+        except Exception as e:
+            detail_message = str(e) if str(e).strip() else "No element(s) found"
+            raise HTTPException(status_code=404, detail=detail_message)
+
