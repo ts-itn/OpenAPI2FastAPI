@@ -301,40 +301,94 @@ def extract_timestamps_start_end(data):
 
 
 
-def getDataSeries(telemetries, map_dict):
-    data_by_ts = {}
-    for key, values in telemetries.items():
-        # Use map_dict for mapping keys
-        mapped_key = map_dict.get(key, key)
+# def getDataSeries(telemetries, map_dict):
+#     data_by_ts = {}
+#     for key, values in telemetries.items():
+#         # Use map_dict for mapping keys
+#         mapped_key = map_dict.get(key, key)
         
-        for item in values:
-            ts_millis = item['ts']
-            value = item['value']
+#         for item in values:
+#             ts_millis = item['ts']
+#             value = item['value']
 
-            if ts_millis not in data_by_ts:
-                data_by_ts[ts_millis] = {}
+#             if ts_millis not in data_by_ts:
+#                 data_by_ts[ts_millis] = {}
             
-            try:
-                converted_value = int(value)
-            except (ValueError, TypeError):
-                converted_value = value  # Keep as original if not an integer
+#             try:
+#                 converted_value = int(value)
+#             except (ValueError, TypeError):
+#                 converted_value = value  # Keep as original if not an integer
             
-            data_by_ts[ts_millis][mapped_key] = converted_value
-            data_by_ts[ts_millis]['timestamp'] = convert_timestamp(ts_millis)
+#             data_by_ts[ts_millis][mapped_key] = converted_value
+#             data_by_ts[ts_millis]['timestamp'] = convert_timestamp(ts_millis)
     
-    return list(data_by_ts.values())
+#     return list(data_by_ts.values())
+
+# def getDataSeries(telemetries, map_dict):
+#     data_by_ts = {}
+#     all_mapped_keys = set()  # Keep track of all mapped keys
+
+#     for key, values in telemetries.items():
+#         # Use map_dict for mapping keys
+#         mapped_key = map_dict.get(key)
+#         if mapped_key is None:
+#             continue  
+
+#         all_mapped_keys.add(mapped_key)  
+
+#         for item in values:
+#             ts_millis = item['ts']
+#             value = item['value']
+
+#             if ts_millis not in data_by_ts:
+#                 data_by_ts[ts_millis] = {}
+
+#             try:
+#                 converted_value = int(value)
+#             except (ValueError, TypeError):
+#                 try:
+#                     converted_value = float(value)
+#                 except (ValueError, TypeError):
+#                     converted_value = value  
+
+#             data_by_ts[ts_millis][mapped_key] = converted_value
+
+  
+#     result = []
+#     for ts_millis, data in data_by_ts.items():
+        
+#         for key in all_mapped_keys:
+#             if key not in data:
+#                 data[key] = 0  
+
+        
+#         data['timestamp'] = convert_timestamp(ts_millis)
+#         output_data = {'timestamp': data['timestamp']}
+#         for key in all_mapped_keys:
+#             output_data[key] = data[key]
+
+#         result.append(output_data)
+
+#     return result
+
 
 def getDataSeries(telemetries, map_dict):
     data_by_ts = {}
-    all_mapped_keys = set()  # Keep track of all mapped keys
+    all_mapped_keys = set()
 
     for key, values in telemetries.items():
-        # Use map_dict for mapping keys
         mapped_key = map_dict.get(key)
         if mapped_key is None:
-            continue  
+            continue
 
-        all_mapped_keys.add(mapped_key)  
+        all_mapped_keys.add(mapped_key)
+
+        # Ensure values is a list
+        if isinstance(values, dict):
+            values = [values]
+        elif not isinstance(values, list):
+            logging.warning(f"Unexpected type for values of key '{key}': {type(values)}")
+            continue
 
         for item in values:
             ts_millis = item['ts']
@@ -343,25 +397,23 @@ def getDataSeries(telemetries, map_dict):
             if ts_millis not in data_by_ts:
                 data_by_ts[ts_millis] = {}
 
+            # Convert value to appropriate type
             try:
                 converted_value = int(value)
             except (ValueError, TypeError):
                 try:
                     converted_value = float(value)
                 except (ValueError, TypeError):
-                    converted_value = value  
+                    converted_value = value
 
             data_by_ts[ts_millis][mapped_key] = converted_value
 
-  
+    # Prepare the result list
     result = []
     for ts_millis, data in data_by_ts.items():
-        
         for key in all_mapped_keys:
-            if key not in data:
-                data[key] = 0  
+            data.setdefault(key, 0)
 
-        
         data['timestamp'] = convert_timestamp(ts_millis)
         output_data = {'timestamp': data['timestamp']}
         for key in all_mapped_keys:
@@ -370,6 +422,11 @@ def getDataSeries(telemetries, map_dict):
         result.append(output_data)
 
     return result
+
+
+
+
+
 
 async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], device_id: str, element_uid: str) -> Set[str]:
     try:
@@ -388,6 +445,7 @@ async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], d
                 asset_id = rel.get('to', {}).get('id')
 
         return asset_id ,operation_mode_1, operation_mode_3, relations
+
     except:
         raise HTTPException(status_code=404, detail="No asset relations found for device with the specified element UID")
 
@@ -415,11 +473,13 @@ async def get_element_data_series(
     customer_id = token_info.get("customer_id")
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     map_dict={}
- 
+    telemetries_right_format = {}
+    start_time = None
+    stop_time = None
     async with httpx.AsyncClient() as client:
         try:
-            global telemetries_right_format
-            global start_time , stop_time
+            # global telemetries_right_format
+            # global start_time , stop_time
             
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
             asset_id , operation_mode_1, operation_mode_3 , relations= await fetch_asset_name(client, headers, device_id, element_uid)
@@ -439,6 +499,7 @@ async def get_element_data_series(
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
                 device_telemetries =["timestamp", "i_kelly_depth_driver" , "i_kelly_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
 
                 kelly_drilling_series={
                                                 
@@ -463,6 +524,7 @@ async def get_element_data_series(
                 device_telemetries=["timestamp", "i_crowd_depth_planum" , "i_crowd_load_winch" , "i_crowd_speed" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
 
                 cfa_drilling_series= {
                                    
@@ -487,7 +549,7 @@ async def get_element_data_series(
                 device_telemetries= ["timestamp", "i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
                                   "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
-
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
 
 
                 full_displacement= {
@@ -503,6 +565,7 @@ async def get_element_data_series(
                         "ui_concrete_pressure": "concretePressure"
                     }
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, full_displacement)
+               
 
 
 
@@ -514,7 +577,7 @@ async def get_element_data_series(
                 device_telemetries=["i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
                                   "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
-
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
 
                 double_rotary_series = {
                     "i_crowd_depth_planum": "depth",
@@ -529,17 +592,23 @@ async def get_element_data_series(
                     "ui_concrete_pressure": "concretePressure"
                 }
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, double_rotary_series)
+                
 
         
             
-                ##### Vibro pilling -Series ################   
-            elif operation_mode_1=="Vibrieren" and operation_mode_3 == "Vibomode 1":
+                ##### Vibro pilling -Series ################  
+               
+            elif operation_mode_1 == "Vibrieren" and operation_mode_3 == "Vibromode 1":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                start_time =1725966648000
+                stop_time =1725966657000
                 device_telemetries=[ "i_crowd_depth_planum" , "i_crowd_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "i_vibrator_revolution_act", "i_vibrator_static_moment_act", "i_vibrator_amplitude"]
-                telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
+                telemetriesFromDevice = await fetch_telemetry_from_device(client, headers, device_id, start_time, stop_time, device_telemetries)
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
+
 
 
                 vibra_pilling_series = {
@@ -557,6 +626,8 @@ async def get_element_data_series(
 
 
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, vibra_pilling_series)
+            else :
+                print("hello")
 
 
 
