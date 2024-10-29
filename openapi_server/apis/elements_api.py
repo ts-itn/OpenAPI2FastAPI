@@ -297,6 +297,14 @@ def convert_timestamp(ts_millis):
 def extract_timestamps_start_end(data):
     start_ts = data.get("start_ts", [{}])[0].get("value")
     stop_ts = data.get("stop_ts", [{}])[0].get("value")
+    
+    
+    if start_ts:
+        try:
+            start_ts = str(int(start_ts) -10000) 
+        except ValueError:
+            pass  
+    
     return start_ts, stop_ts
 
 
@@ -335,20 +343,15 @@ def getDataSeries(telemetries, map_dict):
                     converted_value = value
 
             data_by_ts[ts_millis][mapped_key] = converted_value
-
-    # Prepare the result list
     result = []
     for ts_millis, data in data_by_ts.items():
         for key in all_mapped_keys:
             data.setdefault(key, 0)
-
         data['timestamp'] = convert_timestamp(ts_millis)
         output_data = {'timestamp': data['timestamp']}
         for key in all_mapped_keys:
             output_data[key] = data[key]
-
         result.append(output_data)
-
     return result
 
 
@@ -406,16 +409,14 @@ async def get_element_data_series(
     stop_time = None
     async with httpx.AsyncClient() as client:
         try:
-            # global telemetries_right_format
-            # global start_time , stop_time
+       
             
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
             asset_id , operation_mode_1, operation_mode_3 , relations= await fetch_asset_name(client, headers, device_id, element_uid)
             start_time_millis = 0 
             end_time_millis = int(time.time() * 1000)
             telemetries_right_format = {} 
-            # operation_mode_1="Bohren" 
-            # operation_mode_3 = "VDW"
+     
       
 
            
@@ -530,14 +531,11 @@ async def get_element_data_series(
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
-                start_time =1725966648000
-                stop_time =1725966657000
+         
                 device_telemetries=[ "i_crowd_depth_planum" , "i_crowd_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "i_vibrator_revolution_act", "i_vibrator_static_moment_act", "i_vibrator_amplitude"]
                 telemetriesFromDevice = await fetch_telemetry_from_device(client, headers, device_id, start_time, stop_time, device_telemetries)
                 logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
-
-
 
                 vibra_pilling_series = {
                 "i_crowd_depth_planum": "depth",
@@ -550,17 +548,15 @@ async def get_element_data_series(
                 "i_vibrator_amplitude": "vibratorAmplitude"
                                 }
 
-                
-
-
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, vibra_pilling_series)
             else :
-                print("hello")
+                detail_message = str(e) if str(e).strip() else "No element(s) found"
+                raise HTTPException(status_code=404, detail=detail_message)
 
 
 
 
-            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=100)
+            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=2)
             total_pages = max(1, math.ceil(total_items / 100))
             if not paginated_list:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
