@@ -254,7 +254,7 @@ async def get_elements_by_startdate_and_enddate(
             asset_ids = await fetch_asset_ids(client, headers, device_id )
             telemetries = await fetch_telemetries(client, headers, asset_ids, start_time_millis, end_time_millis, telemetry_keys)
             short_list = process_telemetries(telemetries)
-            paginated_list, total_items = paginate_list(short_list, page_number, page_size=100)
+            paginated_list, total_items = paginate_list(short_list, page_number, page_size=page_size)
             total_pages = max(1, math.ceil(total_items / page_size))
             
             if not paginated_list:
