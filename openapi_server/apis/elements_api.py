@@ -195,7 +195,7 @@ def process_telemetries(telemetries: List[Dict[str, Any]]) -> List[Dict[str, str
             continue
     return short_list
 
-def paginate_list(data_list: List[Any], page_number: int, page_size: int = 100) -> (List[Any], int):
+def paginate_list(data_list: List[Any], page_number: int, page_size: int =100) -> (List[Any], int):
     total_items = len(data_list)
     total_pages = max(1, math.ceil(total_items / page_size))
     if page_number < 1 or page_number > total_pages:
@@ -249,12 +249,14 @@ async def get_elements_by_startdate_and_enddate(
 
     async with httpx.AsyncClient() as client:
         try:
+            page_size = 100
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
             asset_ids = await fetch_asset_ids(client, headers, device_id )
             telemetries = await fetch_telemetries(client, headers, asset_ids, start_time_millis, end_time_millis, telemetry_keys)
             short_list = process_telemetries(telemetries)
             paginated_list, total_items = paginate_list(short_list, page_number, page_size=100)
-            total_pages = max(1, math.ceil(total_items / 100))
+            total_pages = max(1, math.ceil(total_items / page_size))
+            
             if not paginated_list:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
             statistics = {
@@ -274,6 +276,8 @@ async def get_elements_by_startdate_and_enddate(
                 "prevLink": prev_link,
                 "nextLink": next_link
             }
+
+
             return combined_data
         except HTTPException as he:
             raise he
@@ -355,10 +359,6 @@ def getDataSeries(telemetries, map_dict):
     return result
 
 
-
-
-
-
 async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], device_id: str, element_uid: str) -> Set[str]:
     try:
         relations_url = f"https://dacs.site/api/relations/info?fromId={device_id}&fromType=DEVICE"
@@ -367,20 +367,15 @@ async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], d
         relations = response.json()
         if not relations:
             raise HTTPException(status_code=404, detail="No asset relations found for device")
-
-
         for rel in relations:
             if rel.get('to', {}).get('entityType') == 'ASSET' and rel.get('toName').split('/')[1] == element_uid:
                 operation_mode_1 = rel.get('toName').split('/')[2].split("_")[0]
                 operation_mode_3 = rel.get('toName').split('/')[2].split("_")[1]
                 asset_id = rel.get('to', {}).get('id')
-
         return asset_id ,operation_mode_1, operation_mode_3, relations
 
     except:
         raise HTTPException(status_code=404, detail="No asset relations found for device with the specified element UID")
-
-
 @router.get(
     "/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/data_series/",
     responses={
@@ -398,7 +393,6 @@ async def get_element_data_series(
     page_number: int = Query(1, description="Page number, starting from 1", alias="page-number"),
     token_bearer: dict = Security(get_token_bearer)
 ):
-    
     token_info = token_bearer
     tenant_admin = token_info.get("tenant_admin", False)
     customer_id = token_info.get("customer_id")
@@ -409,17 +403,12 @@ async def get_element_data_series(
     stop_time = None
     async with httpx.AsyncClient() as client:
         try:
-       
-            
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
             asset_id , operation_mode_1, operation_mode_3 , relations= await fetch_asset_name(client, headers, device_id, element_uid)
             start_time_millis = 0 
             end_time_millis = int(time.time() * 1000)
             telemetries_right_format = {} 
-     
-      
-
-           
+          
 
             ##### Kelly Drilling -Series ################
             if operation_mode_1=="Bohren" and operation_mode_3 == "Kelly":
@@ -429,7 +418,6 @@ async def get_element_data_series(
                 device_telemetries =["timestamp", "i_kelly_depth_driver" , "i_kelly_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
                 logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
-
                 kelly_drilling_series={
                                                 
                                                 "i_kelly_depth_driver": "depth",
@@ -439,10 +427,7 @@ async def get_element_data_series(
                                                 "i_leader_inclination_x": "leaderInclinationX",
                                                 "i_leader_inclination_y": "leaderInclinationY"
                                             }
-                
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, kelly_drilling_series)
-
-        
 
              ##### CFA Drilling- Series ################   
             elif operation_mode_1=="Bohren" and operation_mode_3 == "Sob":
@@ -467,8 +452,6 @@ async def get_element_data_series(
                                     "ui_concrete_pressure": "concretePressure"
                                 }
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, cfa_drilling_series)
-
-                    
 
              ##### Full displacement - Series ################   
             elif operation_mode_1=="Bohren" and operation_mode_3 == "Vorbohren":
@@ -495,9 +478,6 @@ async def get_element_data_series(
                     }
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, full_displacement)
                
-
-
-
              ##### Double rotary Series  ################   
             elif operation_mode_1=="Bohren" and operation_mode_3 == "VDW":
                 telemetry_keys =["start_ts" , "stop_ts" ]
@@ -522,16 +502,12 @@ async def get_element_data_series(
                 }
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, double_rotary_series)
                 
-
-        
-            
                 ##### Vibro pilling -Series ################  
                
             elif operation_mode_1 == "Vibrieren" and operation_mode_3 == "Vibromode 1":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
-         
                 device_telemetries=[ "i_crowd_depth_planum" , "i_crowd_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "i_vibrator_revolution_act", "i_vibrator_static_moment_act", "i_vibrator_amplitude"]
                 telemetriesFromDevice = await fetch_telemetry_from_device(client, headers, device_id, start_time, stop_time, device_telemetries)
@@ -552,12 +528,8 @@ async def get_element_data_series(
             else :
                 detail_message = str(e) if str(e).strip() else "No element(s) found"
                 raise HTTPException(status_code=404, detail=detail_message)
-
-
-
-
-            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=2)
-            total_pages = max(1, math.ceil(total_items / 100))
+            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=100)
+            total_pages = max(1, math.ceil(total_items / 2))
             if not paginated_list:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
             statistics = {
