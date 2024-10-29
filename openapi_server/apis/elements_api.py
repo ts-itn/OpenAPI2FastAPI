@@ -278,39 +278,75 @@ async def get_elements_by_startdate_and_enddate(
 def convert_timestamp(ts_millis):
     timestamp_seconds = int(ts_millis) / 1000
     return datetime.fromtimestamp(timestamp_seconds, timezone.utc).isoformat()
-def  getDataSeries(telemetries):
+    # iso_format = datetime.fromtimestamp(ts_millis, tz=timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    # return iso_format
+
+
+
+
+# def  getDataSeries(telemetries):
+#     data_by_ts = {}
+#     for key, values in telemetries.items():
+#         for item in values:
+#             ts_millis = item['ts']
+#             value = item['value']
+#             if ts_millis not in data_by_ts:
+#                 data_by_ts[ts_millis] = {}
+#             try:
+#                 converted_value = int(value)
+#             except ValueError:
+#                 converted_value = value
+#             data_by_ts[ts_millis][key] = converted_value
+#             data_by_ts[ts_millis]['timestamp'] = convert_timestamp(ts_millis)
+#     result = list(data_by_ts.values())
+#     return result
+
+
+def getDataSeries(telemetries, map_dict):
     data_by_ts = {}
     for key, values in telemetries.items():
+        # Use map_dict for mapping keys
+        mapped_key = map_dict.get(key, key)
+        
         for item in values:
             ts_millis = item['ts']
             value = item['value']
+
             if ts_millis not in data_by_ts:
                 data_by_ts[ts_millis] = {}
+            
             try:
                 converted_value = int(value)
-            except ValueError:
-                converted_value = value
-            data_by_ts[ts_millis][key] = converted_value
+            except (ValueError, TypeError):
+                converted_value = value  # Keep as original if not an integer
+            
+            data_by_ts[ts_millis][mapped_key] = converted_value
             data_by_ts[ts_millis]['timestamp'] = convert_timestamp(ts_millis)
-    result = list(data_by_ts.values())
-    return result
+    
+    return list(data_by_ts.values())
+
+
 
 async def fetch_asset_name(client: httpx.AsyncClient, headers: Dict[str, str], device_id: str, element_uid: str) -> Set[str]:
-    relations_url = f"https://dacs.site/api/relations/info?fromId={device_id}&fromType=DEVICE"
-    response = await client.get(relations_url, headers=headers)
-    response.raise_for_status()
-    relations = response.json()
-    if not relations:
-        raise HTTPException(status_code=404, detail="No asset relations found for device")
+    try:
+        relations_url = f"https://dacs.site/api/relations/info?fromId={device_id}&fromType=DEVICE"
+        response = await client.get(relations_url, headers=headers)
+        response.raise_for_status()
+        relations = response.json()
+        if not relations:
+            raise HTTPException(status_code=404, detail="No asset relations found for device")
 
 
-    for rel in relations:
-        if rel.get('to', {}).get('entityType') == 'ASSET' and rel.get('toName').split('/')[1] == element_uid:
-            mode_1 = rel.get('toName').split('/')[2].split("_")[0]
-            mode_2 = rel.get('toName').split('/')[2].split("_")[1]
-            asset_id = rel.get('to', {}).get('id')
+        for rel in relations:
+            if rel.get('to', {}).get('entityType') == 'ASSET' and rel.get('toName').split('/')[1] == element_uid:
+                operation_mode_1 = rel.get('toName').split('/')[2].split("_")[0]
+                operation_mode_3 = rel.get('toName').split('/')[2].split("_")[1]
+                asset_id = rel.get('to', {}).get('id')
 
-    return asset_id , mode_1, mode_2, relations
+        return asset_id ,operation_mode_1, operation_mode_3, relations
+    except:
+        raise HTTPException(status_code=404, detail="No asset relations found for device with the specified element UID")
+
 
 @router.get(
     "/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/data_series/",
@@ -334,67 +370,134 @@ async def get_element_data_series(
     tenant_admin = token_info.get("tenant_admin", False)
     customer_id = token_info.get("customer_id")
     headers = {"Authorization": f"Bearer {token_info['token']}"}
+    map_dict={}
+ 
+
+   
 
 
 
 
     async with httpx.AsyncClient() as client:
         try:
+            global telemetries_right_format
+            
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
-            asset_id , mode_1, mode_2 , relations= await fetch_asset_name(client, headers, device_id, element_uid)
+            asset_id , operation_mode_1, operation_mode_3 , relations= await fetch_asset_name(client, headers, device_id, element_uid)
             start_time_millis = 0 
             end_time_millis = int(time.time() * 1000)
+            telemetries_right_format = {} 
+            operation_mode_1="Bohren"
+            operation_mode_3 ="Sob"
+
            
 
             ##### Kelly Drilling -Series ################
-            if mode_2=="Kelly":
+            if operation_mode_1=="Bohren" and operation_mode_3 == "Kelly":
                 telemetry_keys =["timestamp", "i_kelly_depth_driver" , "i_kelly_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y"]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-               
 
-             ##### Kelly Drilling- Series ################   
-            elif mode_2=="CFA":
+                kelly_drilling_series={
+                                                
+                                                "i_kelly_depth_driver": "depth",
+                                                "i_drill_drive_revolution_1": "rotationSpeedRotaryDrive",
+                                                "i_kelly_speed": "kellyRopeSpeed",
+                                                "i_crowd_load_winch": "crowdForce",
+                                                "i_leader_inclination_x": "leaderInclinationX",
+                                                "i_leader_inclination_y": "leaderInclinationY"
+                                            }
+
+                telemetries_right_format = getDataSeries(telemetries, kelly_drilling_series)
+        
+
+             ##### CFA Drilling- Series ################   
+            elif operation_mode_1=="Bohren" and operation_mode_3 == "Sob":
+
                 telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_crowd_load_winch" , "i_crowd_speed" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-                
+                cfa_drilling_series= {
+                                   
+                                    "i_crowd_depth_planum": "depth",
+                                    "i_drill_drive_revolution_1": "rotationSpeedRotaryDrive",
+                                    "i_crowd_load_winch": "crowdForce",
+                                    "i_crowd_speed": "crowdSpeed",
+                                    "i_leader_inclination_x": "leaderInclinationX",
+                                    "i_leader_inclination_y": "leaderInclinationY",
+                                    "udi_concrete_quantity_total": "totalConcreteVolume",
+                                    "ui_concrete_pressure": "concretePressure"
+                                }
+                telemetries_right_format = getDataSeries(telemetries, cfa_drilling_series)
+
+                    
 
              ##### Full displacement - Series ################   
-            elif mode_2=="Full displacement":
+            elif operation_mode_1=="Bohren" and operation_mode_3 == "Vollverdränger":
                 telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
                                   "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-              
+
+                full_displacement= {
+                        "i_crowd_depth_planum": "depth",
+                        "i_drill_drive_relative_movement_vdw": "relativeAugerPosition",
+                        "i_crowd_speed": "crowdSpeed",
+                        "i_drill_drive_revolution_1": "rotationSpeedAuger",
+                        "i_drill_drive_revolution_2": "rotationSpeedCasing",
+                        "i_crowd_load_winch": "crowdForce",
+                        "i_leader_inclination_x": "leaderInclinationX",
+                        "i_leader_inclination_y": "leaderInclinationY",
+                        "udi_concrete_quantity_total": "totalConcreteVolume",
+                        "ui_concrete_pressure": "concretePressure"
+                    }
+                telemetries_right_format = getDataSeries(telemetries, full_displacement)
+
 
 
              ##### Double rotary Series  ################   
-            elif mode_2==" Double rotary":
+            elif operation_mode_1=="Bohren" and operation_mode_3 == "VDW":
                 telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
                                   "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+                double_rotary_series = {
+                    "i_crowd_depth_planum": "depth",
+                    "i_drill_drive_relative_movement_vdw": "relativeAugerPosition",
+                    "i_crowd_speed": "crowdSpeed",
+                    "i_drill_drive_revolution_1": "rotationSpeedAuger",
+                    "i_drill_drive_revolution_2": "rotationSpeedCasing",
+                    "i_crowd_load_winch": "crowdForce",
+                    "i_leader_inclination_x": "leaderInclinationX",
+                    "i_leader_inclination_y": "leaderInclinationY",
+                    "udi_concrete_quantity_total": "totalConcreteVolume",
+                    "ui_concrete_pressure": "concretePressure"
+                }
+                telemetries_right_format = getDataSeries(telemetries, double_rotary_series)
+
         
             
                 ##### Vibro pilling -Series ################   
-            elif mode_2=="Vibro pilling":
+            elif operation_mode_1=="Vibrieren" and operation_mode_3 == "Vibomode 1":
                 telemetry_keys =["timestamp", "i_crowd_depth_planum" , "i_crowd_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "i_vibrator_revolution_act", "i_vibrator_static_moment_act", "i_vibrator_amplitude"]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
+
+
+
+                vibra_pilling_series = {
+                "i_crowd_depth_planum": "depth",
+                "i_crowd_speed": "crowdSpeed",
+                "i_crowd_load_winch": "crowdForce",
+                "i_leader_inclination_x": "leaderInclinationX",
+                "i_leader_inclination_y": "leaderInclinationY",
+                "i_vibrator_revolution_act": "vibratorFrequency",
+                "i_vibrator_static_moment_act": "staticMoment",
+                "i_vibrator_amplitude": "vibratorAmplitude"
+                                }
+
                 
 
 
-            ##########  Delete this part #########
-            else:
-                telemetry_keys =["timestamp", "depthOrientation" , "dw_counter" , "gnummer" , "pfahl", "s_operation_mode_1",
-                                  "s_operation_mode_3", "s_SFID_unique_rec_counter", "start_ts"]
-                telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-
-
-
-
-
-
-            telemerties_right_format = getDataSeries(telemetries)
-            paginated_list, total_items = paginate_list(telemerties_right_format, page_number, page_size=100)
+            # telemerties_right_format = getDataSeries(telemetries)
+            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=100)
             total_pages = max(1, math.ceil(total_items / 100))
             if not paginated_list:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
