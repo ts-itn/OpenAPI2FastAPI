@@ -282,26 +282,6 @@ def convert_timestamp(ts_millis):
     # return iso_format
 
 
-
-
-# def  getDataSeries(telemetries):
-#     data_by_ts = {}
-#     for key, values in telemetries.items():
-#         for item in values:
-#             ts_millis = item['ts']
-#             value = item['value']
-#             if ts_millis not in data_by_ts:
-#                 data_by_ts[ts_millis] = {}
-#             try:
-#                 converted_value = int(value)
-#             except ValueError:
-#                 converted_value = value
-#             data_by_ts[ts_millis][key] = converted_value
-#             data_by_ts[ts_millis]['timestamp'] = convert_timestamp(ts_millis)
-#     result = list(data_by_ts.values())
-#     return result
-
-
 def getDataSeries(telemetries, map_dict):
     data_by_ts = {}
     for key, values in telemetries.items():
@@ -372,12 +352,6 @@ async def get_element_data_series(
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     map_dict={}
  
-
-   
-
-
-
-
     async with httpx.AsyncClient() as client:
         try:
             global telemetries_right_format
