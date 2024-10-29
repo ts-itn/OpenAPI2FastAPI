@@ -542,7 +542,7 @@ async def get_element_data_series(
                     
 
              ##### Full displacement - Series ################   
-            elif operation_mode_1=="Bohren" and operation_mode_3 == "Vollverdränger":
+            elif operation_mode_1=="Bohren" and operation_mode_3 == "Vorbohren":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
