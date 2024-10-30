@@ -34,6 +34,10 @@ from openapi_server.models.element_short_list import ElementShortList
 from openapi_server.models.element import Element
 from openapi_server.security_api import get_token_bearer
 from datetime import datetime, timezone
+
+
+
+page_size=100
 load_dotenv()
 router = APIRouter()
 login_url = os.getenv('login_url', 'https://dacs.site/api/auth/login')
@@ -249,7 +253,7 @@ async def get_elements_by_startdate_and_enddate(
 
     async with httpx.AsyncClient() as client:
         try:
-            page_size = 100
+            # page_size = 100
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
             asset_ids = await fetch_asset_ids(client, headers, device_id )
             telemetries = await fetch_telemetries(client, headers, asset_ids, start_time_millis, end_time_millis, telemetry_keys)
@@ -528,8 +532,9 @@ async def get_element_data_series(
             else :
                 detail_message = str(e) if str(e).strip() else "No element(s) found"
                 raise HTTPException(status_code=404, detail=detail_message)
-            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=100)
-            total_pages = max(1, math.ceil(total_items / 2))
+            
+            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=page_size)
+            total_pages = max(1, math.ceil(total_items / page_size))
             if not paginated_list:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
             statistics = {
@@ -589,8 +594,8 @@ async def get_element_meassurement_data_series(
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     map_dict={}
     telemetries_right_format = {}
-    start_time =  0 
-    stop_time = int(time.time() * 1000)
+    start_time = None
+    stop_time = None
     async with httpx.AsyncClient() as client:
         try:
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
@@ -598,6 +603,8 @@ async def get_element_meassurement_data_series(
             start_time_millis = 0 
             end_time_millis = int(time.time() * 1000)
             telemetries_right_format = {} 
+            start_time =  0 
+            stop_time = int(time.time() * 1000)
           
 
             ##### Kelly Drilling -Series ################
@@ -718,8 +725,8 @@ async def get_element_meassurement_data_series(
             else :
                 detail_message = str(e) if str(e).strip() else "No element(s) found"
                 raise HTTPException(status_code=404, detail=detail_message)
-            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=100)
-            total_pages = max(1, math.ceil(total_items / 2))
+            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=page_size)
+            total_pages = max(1, math.ceil(total_items / page_size))
             if not paginated_list:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
             statistics = {
@@ -729,10 +736,10 @@ async def get_element_meassurement_data_series(
             }
             prev_link = None
             if page_number > 1:
-                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
+                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number - 1}"}
             next_link = None
             if page_number < total_pages:
-                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
+                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number + 1}"}
             combined_data = {
                 "dataSeries": paginated_list,
                 "statistics": statistics,
