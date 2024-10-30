@@ -544,10 +544,12 @@ async def get_element_data_series(
             }
             prev_link = None
             if page_number > 1:
-                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
+                # prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
+                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number - 1}"}
             next_link = None
             if page_number < total_pages:
-                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
+                # next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
+                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number + 1}"}
             combined_data = {
                 "dataSeries": paginated_list,
                 "statistics": statistics,
