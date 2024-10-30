@@ -46,7 +46,6 @@ class CustomLoginForm(BaseModel):
     username: str
     password: str
 
-
 @router.post("/login")
 async def login(form_data: CustomLoginForm = Depends()):
     global token_global
@@ -64,32 +63,8 @@ async def login(form_data: CustomLoginForm = Depends()):
         token = data.get("token")
         if not token:
             raise HTTPException(status_code=500, detail="Token not found in response")
-
-        toker_global = token  # Save token in global variable (consider better alternatives for production)
-        return {"token": toker_global}
-    
-
-
-
-def paginate_list(data_list, page_number, page_size=100):
-    start_index = (page_number - 1) * page_size
-    end_index = start_index + page_size
-    paginated_list = data_list[start_index:end_index]
-    if not paginated_list and page_number != 1:
-        return "No items to display. Page number may be out of range.", []
-    return paginated_list, len(data_list)
-
-
-
-
-
-
-
-
-
-
-
-
+        token_global = token
+        return {"token": token_global}
 
 
 @router.get("/get_token_info")
@@ -594,3 +569,6 @@ async def get_element_data_series(
 
 
 ################################## Part 3 ###########################################################################
+### write here
+##################################Part 3###########################################################################
+
