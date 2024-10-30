@@ -152,7 +152,7 @@ async def fetch_telemetry_from_device(client: httpx.AsyncClient, headers: Dict[s
     keys_str = ",".join(telemetry_keys)
     url_telemetry = (
         f"https://dacs.site/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries"
-        f"?keys={keys_str}&startTs={start_time_millis}&endTs={end_time_millis}"
+        f"?keys={keys_str}&startTs={start_time_millis}&endTs={end_time_millis}&orderBy=ASC"
     )
     response = await client.get(url_telemetry, headers=headers)
     response.raise_for_status()
@@ -604,7 +604,7 @@ async def get_element_data_series(
                 "prevLink": prev_link_data_series,
                 "nextLink": next_link_data_series
             }
-            return combined_data_data_series
+            return combined_data_data_series, start_time, stop_time, telemetriesFromDevice
         except HTTPException as he:
             raise he
         except Exception as e:
