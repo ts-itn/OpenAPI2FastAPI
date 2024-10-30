@@ -753,3 +753,4 @@ async def get_element_meassurement_data_series(
             raise HTTPException(status_code=404, detail=detail_message)
 
 
+################################## Part 4 ###########################################################################
