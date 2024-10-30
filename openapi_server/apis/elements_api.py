@@ -46,6 +46,7 @@ class CustomLoginForm(BaseModel):
     username: str
     password: str
 
+
 @router.post("/login")
 async def login(form_data: CustomLoginForm = Depends()):
     global token_global
