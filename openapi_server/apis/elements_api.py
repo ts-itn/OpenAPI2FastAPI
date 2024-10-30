@@ -67,19 +67,19 @@ async def login(form_data: CustomLoginForm = Depends()):
         return {"token": token_global}
 
 
-@router.get("/get_token_info")
-async def get_info(token_info: dict= Depends(get_token_bearer)):
-    return token_info
-customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
-tenant_base_url = "https://dacs.site/api/tenant/devices" 
-relationsDevice2Asset = "https://dacs.site/api/relations?fromId={YOUR_DEVICE_ID}&fromType=DEVICE"
-asset_details_url = "https://dacs.site/api/asset/{assetId}"
-asset_telemetry_url = (
-    "https://dacs.site/api/plugins/telemetry/ASSET/{assetId}/values/timeseries"
-    "?keys={telemetry_keys}&startTs={start_date}&endTs={end_date}"
-    # "&interval={interval}&limit={limit}&agg={agg}&orderBy={orderBy}"
+# @router.get("/get_token_info")
+# async def get_info(token_info: dict= Depends(get_token_bearer)):
+#     return token_info
+# customer_base_url = "https://dacs.site/api/customer/{customerId}/devices"
+# tenant_base_url = "https://dacs.site/api/tenant/devices" 
+# relationsDevice2Asset = "https://dacs.site/api/relations?fromId={YOUR_DEVICE_ID}&fromType=DEVICE"
+# asset_details_url = "https://dacs.site/api/asset/{assetId}"
+# asset_telemetry_url = (
+#     "https://dacs.site/api/plugins/telemetry/ASSET/{assetId}/values/timeseries"
+#     "?keys={telemetry_keys}&startTs={start_date}&endTs={end_date}"
+#     # "&interval={interval}&limit={limit}&agg={agg}&orderBy={orderBy}"
 
-)
+# )
 
 async def fetch_device_id(client: httpx.AsyncClient, headers: Dict[str, str], oemISOidentifier: str, tenant_admin: bool, customer_id: str) -> str:
     if tenant_admin:
@@ -253,36 +253,37 @@ async def get_elements_by_startdate_and_enddate(
 
     async with httpx.AsyncClient() as client:
         try:
-            # page_size = 100
+            
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
             asset_ids = await fetch_asset_ids(client, headers, device_id )
             telemetries = await fetch_telemetries(client, headers, asset_ids, start_time_millis, end_time_millis, telemetry_keys)
             short_list = process_telemetries(telemetries)
-            paginated_list, total_items = paginate_list(short_list, page_number, page_size=page_size)
-            total_pages = max(1, math.ceil(total_items / page_size))
+            paginated_list_elements, total_items_elements = paginate_list(short_list, page_number, page_size=page_size)
+            total_pages_elements = max(1, math.ceil(total_items_elements / page_size))
             
-            if not paginated_list:
+            if not paginated_list_elements:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
-            statistics = {
-                "totalPages": total_pages,
-                "pageSize": len(paginated_list),
+            statistics_elements = {
+                "totalPages": total_pages_elements,
+                "pageSize": len(paginated_list_elements),
                 "currentPage": page_number
             }
-            prev_link = None
+            prev_link_elements = None
             if page_number > 1:
-                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
-            next_link = None
-            if page_number < total_pages:
-                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
-            combined_data = {
-                "ShortList": paginated_list,
-                "statistics": statistics,
-                "prevLink": prev_link,
-                "nextLink": next_link
+                prev_link_elements = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
+            next_link_elements = None
+            if page_number < total_pages_elements:
+           
+                next_link_elements = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
+            combined_data_elements= {
+                "ShortList": paginated_list_elements,
+                "statistics": statistics_elements,
+                "prevLink": prev_link_elements,
+                "nextLink": next_link_elements
             }
 
 
-            return combined_data
+            return combined_data_elements
         except HTTPException as he:
             raise he
         except Exception as e:
@@ -303,18 +304,43 @@ def convert_timestamp(ts_millis):
     # return iso_format
 
 def extract_timestamps_start_end(data):
-    start_ts = data.get("start_ts", [{}])[0].get("value")
-    stop_ts = data.get("stop_ts", [{}])[0].get("value")
-    
-    
+    start_ts_list = data.get("start_ts", [])
+    stop_ts_list = data.get("stop_ts", [])
+
+    if not start_ts_list or not stop_ts_list:
+        return None, None
+
+    start_ts = start_ts_list[0].get("value")
+    stop_ts = stop_ts_list[0].get("value")
+
     if start_ts:
         try:
-            start_ts = str(int(start_ts) -10000) 
+            start_ts = str(int(start_ts))
         except ValueError:
-            pass  
-    
+            pass
+
     return start_ts, stop_ts
 
+
+
+
+def extract_timestamps_start_end_1_sec_early(data):
+    start_ts_list = data.get("start_ts", [])
+    stop_ts_list = data.get("stop_ts", [])
+
+    if not start_ts_list or not stop_ts_list:
+        return None, None
+
+    start_ts = start_ts_list[0].get("value")
+    stop_ts = stop_ts_list[0].get("value")
+
+    if start_ts:
+        try:
+            start_ts = str(int(start_ts) )
+        except ValueError:
+            pass
+
+    return start_ts, stop_ts
 
 def getDataSeries(telemetries, map_dict):
     data_by_ts = {}
@@ -403,8 +429,8 @@ async def get_element_data_series(
     headers = {"Authorization": f"Bearer {token_info['token']}"}
     map_dict={}
     telemetries_right_format = {}
-    start_time = None
-    stop_time = None
+    start_time = 10
+    stop_time = 5
     async with httpx.AsyncClient() as client:
         try:
             device_id = await fetch_device_id(client, headers, oemISOidentifier, tenant_admin, customer_id)
@@ -412,16 +438,20 @@ async def get_element_data_series(
             start_time_millis = 0 
             end_time_millis = int(time.time() * 1000)
             telemetries_right_format = {} 
+           
           
 
             ##### Kelly Drilling -Series ################
             if operation_mode_1=="Bohren" and operation_mode_3 == "Kelly":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-                start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                start_time, stop_time =  extract_timestamps_start_end_1_sec_early(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
+                
                 device_telemetries =["timestamp", "i_kelly_depth_driver" , "i_kelly_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
-                # logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
                 kelly_drilling_series={
                                                 
                                                 "i_kelly_depth_driver": "depth",
@@ -438,11 +468,14 @@ async def get_element_data_series(
 
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-                start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                start_time, stop_time =  extract_timestamps_start_end_1_sec_early(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
+                
                 device_telemetries=["timestamp", "i_crowd_depth_planum" , "i_crowd_load_winch" , "i_crowd_speed" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
-                # logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
 
                 cfa_drilling_series= {
                                    
@@ -461,11 +494,15 @@ async def get_element_data_series(
             elif operation_mode_1=="Bohren" and operation_mode_3 == "Vorbohren":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-                start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                start_time, stop_time =  extract_timestamps_start_end_1_sec_early(telemetries)
+
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
+                
                 device_telemetries= ["timestamp", "i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
                                   "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
-                # logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
+                logging.debug(f"Telemetries from device: {telemetriesFromDevice}")
 
 
                 full_displacement= {
@@ -486,7 +523,11 @@ async def get_element_data_series(
             elif operation_mode_1=="Bohren" and operation_mode_3 == "VDW":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-                start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                start_time, stop_time =  extract_timestamps_start_end_1_sec_early(telemetries)
+
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
+                
                 device_telemetries=["i_crowd_depth_planum" , "i_drill_drive_relative_movement_vdw" , "i_crowd_speed" , "i_drill_drive_revolution_1", "i_drill_drive_revolution_2",
                                   "i_crowd_load_winch", "i_leader_inclination_x", "i_leader_inclination_y", "udi_concrete_quantity_total", "ui_concrete_pressure"]
                 telemetriesFromDevice =await fetch_telemetry_from_device(client ,headers,device_id, start_time , stop_time, device_telemetries )
@@ -511,7 +552,11 @@ async def get_element_data_series(
             elif operation_mode_1 == "Vibrieren" and operation_mode_3 == "Vibromode 1":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
-                start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                start_time, stop_time =  extract_timestamps_start_end_1_sec_early(telemetries)
+
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
+                
                 device_telemetries=[ "i_crowd_depth_planum" , "i_crowd_speed" , "i_crowd_load_winch" , "i_leader_inclination_x", "i_leader_inclination_y",
                                   "i_vibrator_revolution_act", "i_vibrator_static_moment_act", "i_vibrator_amplitude"]
                 telemetriesFromDevice = await fetch_telemetry_from_device(client, headers, device_id, start_time, stop_time, device_telemetries)
@@ -530,39 +575,41 @@ async def get_element_data_series(
 
                 telemetries_right_format = getDataSeries(telemetriesFromDevice, vibra_pilling_series)
             else :
-                detail_message = str(e) if str(e).strip() else "No element(s) found"
-                raise HTTPException(status_code=404, detail=detail_message)
+                raise HTTPException(status_code=404, detail= "No element(s) found)")
             
-            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=page_size)
-            total_pages = max(1, math.ceil(total_items / page_size))
-            if not paginated_list:
+            paginated_list_data_series, total_items_data_series = paginate_list(telemetries_right_format, page_number, page_size=page_size)
+            total_pages_data_series = max(1, math.ceil(total_items_data_series / page_size))
+            if not paginated_list_data_series:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
             statistics = {
-                "totalPages": total_pages,
-                "pageSize": len(paginated_list),
+                "totalPages": total_pages_data_series,
+                "pageSize": len(paginated_list_data_series),
                 "currentPage": page_number
             }
-            prev_link = None
+            prev_link_data_series = None
             if page_number > 1:
-                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
-            next_link = None
-            if page_number < total_pages:
-                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
-            combined_data = {
-                "dataSeries": paginated_list,
+                prev_link_data_series = {
+                    "href": f"/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/data_series/?page-number={page_number - 1}"
+                  
+                }
+            next_link_data_series = None
+            if page_number < total_pages_data_series:
+                next_link_data_series = {
+                    "href": f"/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/data_series/?page-number={page_number + 1}"
+                     
+                }
+            combined_data_data_series = {
+                "dataSeries": paginated_list_data_series,
                 "statistics": statistics,
-                "prevLink": prev_link,
-                "nextLink": next_link
+                "prevLink": prev_link_data_series,
+                "nextLink": next_link_data_series
             }
-            return combined_data
+            return combined_data_data_series
         except HTTPException as he:
             raise he
         except Exception as e:
             detail_message = str(e) if str(e).strip() else "No element(s) found"
             raise HTTPException(status_code=404, detail=detail_message)
-
-
-
 
 
 
@@ -724,28 +771,28 @@ async def get_element_meassurement_data_series(
             else :
                 detail_message = str(e) if str(e).strip() else "No element(s) found"
                 raise HTTPException(status_code=404, detail=detail_message)
-            paginated_list, total_items = paginate_list(telemetries_right_format, page_number, page_size=page_size)
-            total_pages = max(1, math.ceil(total_items / page_size))
-            if not paginated_list:
+            paginated_list_measurement_pass, total_items_measurement_pass = paginate_list(telemetries_right_format, page_number, page_size=page_size)
+            total_pages = max(1, math.ceil(total_items_measurement_pass / page_size))
+            if not paginated_list_measurement_pass:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
-            statistics = {
+            statistics_measurement_pass = {
                 "totalPages": total_pages,
-                "pageSize": len(paginated_list),
+                "pageSize": len(paginated_list_measurement_pass),
                 "currentPage": page_number
             }
             prev_link = None
             if page_number > 1:
-                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number - 1}"}
+                prev_link_measurement_pass = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number - 1}"}
             next_link = None
             if page_number < total_pages:
-                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number + 1}"}
-            combined_data = {
-                "measurementPassSeries": paginated_list,
-                "statistics": statistics,
-                "prevLink": prev_link,
-                "nextLink": next_link
+                next_link_measurement_pass = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?page-number={page_number + 1}"}
+            combined_data_measurement_pass = {
+                "measurementPassSeries": paginated_list_measurement_pass,
+                "statistics": statistics_measurement_pass,
+                "prevLink": prev_link_measurement_pass,
+                "nextLink": next_link_measurement_pass
             }
-            return combined_data
+            return combined_data_measurement_pass
         except HTTPException as he:
             raise he
         except Exception as e:
@@ -793,6 +840,8 @@ async def get_element_event_data(
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
                 
 
              ##### CFA Drilling- Series ################   
@@ -801,12 +850,16 @@ async def get_element_event_data(
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
                 
              ##### Full displacement - Series ################   
             elif operation_mode_1=="Bohren" and operation_mode_3 == "Vorbohren":
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
                 
 
              ##### Double rotary Series  ################   
@@ -814,6 +867,8 @@ async def get_element_event_data(
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
                
                 
                 ##### Vibro pilling -Series ################  
@@ -822,13 +877,15 @@ async def get_element_event_data(
                 telemetry_keys =["start_ts" , "stop_ts" ]
                 telemetries = await fetch_telemetry(client, headers, asset_id, start_time_millis, end_time_millis, telemetry_keys)
                 start_time, stop_time =  extract_timestamps_start_end(telemetries)
+                if start_time is None or stop_time is None:
+                    raise HTTPException(status_code=404, detail="Start time or stop time not found in telemetry data.")
                 
             else :
                 detail_message = str(e) if str(e).strip() else "No element(s) found"
                 raise HTTPException(status_code=404, detail=detail_message)
             
-
-
+  
+            
             start_time_UTC = convert_timestamp(start_time)
             stop_time_UTC = convert_timestamp(stop_time)
 
@@ -842,28 +899,33 @@ async def get_element_event_data(
                                         
             
             
-            paginated_list, total_items = paginate_list(telemery_start_stop_time_list, page_number, page_size=page_size)
-            total_pages = max(1, math.ceil(total_items / page_size))
-            if not paginated_list:
+            paginated_list_event_data, total_items_event_data = paginate_list(telemery_start_stop_time_list, page_number, page_size=page_size)
+            total_pages_event_data = max(1, math.ceil(total_items_event_data / page_size))
+            if not paginated_list_event_data:
                 raise HTTPException(status_code=404, detail="No element(s) found on this page")
-            statistics = {
-                "totalPages": total_pages,
-                "pageSize": len(paginated_list),
+            statistics_event_data = {
+                "totalPages": total_pages_event_data,
+                "pageSize": len(paginated_list_event_data),
                 "currentPage": page_number
             }
-            prev_link = None
+            prev_link_event_data = None
             if page_number > 1:
-                prev_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number - 1}"}
-            next_link = None
-            if page_number < total_pages:
-                next_link = {"href": f"/Fleet/Equipment/{oemISOidentifier}/elements?start-date={start_date}&end-date={end_date}&page-number={page_number + 1}"}
-            combined_data = {
-                "eventData": paginated_list,
-                "statistics": statistics,
-                "prevLink": prev_link,
-                "nextLink": next_link
+                prev_link_event_data ="Hello"
+                prev_link_event_data = {
+                        "href": f"/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/event_data/?page-number={page_number-1}"
+                                        }
+            next_link_event_data = None
+            if page_number < total_pages_event_data:
+                next_link_event_data = {
+                    "href": f"/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/event_data/?page-number={page_number+1}"
+                                                        }
+            combined_data_event_data = {
+                "eventData": paginated_list_event_data,
+                "statistics": statistics_event_data,
+                "prevLink": prev_link_event_data,
+                "nextLink": next_link_event_data
             }
-            return combined_data
+            return combined_data_event_data
         except HTTPException as he:
             raise he
         except Exception as e:
