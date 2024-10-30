@@ -563,5 +563,30 @@ async def get_element_data_series(
 
 
 
+################################## Part 3 ###########################################################################
+
+@router.get(
+    "/Fleet/Equipment/{oemISOidentifier}/elements/{element_uid}/measurement_pass/",
+    responses={
+        200: {"model": GetMeasurementPassSeries, "description": "Successful operation"},
+        400: {"description": "Invalid parameter supplied"},
+        404: {"description": "No element(s) found"},
+    },
+    tags=["Elements"],
+    summary="Get all data_series of a measurement pass of element with uid",
+    response_model_by_alias=True,
+)
+async def get_element_meassurement_data_series(
+    oemISOidentifier: str = Path(..., description="OEM ISO identifier, as defined in ISO 15143-3"),
+    element_uid: str = Path(..., description="unique Id of the element"),
+    page_number: int = Query(None, description="Page number, starting from 1", alias="page-number"),
+    token_bearer: TokenModel = Security(
+        get_token_bearer
+    ),
+) -> GetMeasurementPassSeries:
+    """Returns requested measurement pass dataseries about one element"""
+    if not BaseElementsApi.subclasses:
+        raise HTTPException(status_code=500, detail="Not implemented")
+    return await BaseElementsApi.subclasses[0]().get_element_meassurement_data_series(oemISOidentifier, element_uid, page_number)
 
 
